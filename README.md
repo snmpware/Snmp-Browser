@@ -1,7 +1,3 @@
-<div align="center">
-  <img src="icon.png" alt="SNMP Browser Professional Logo" width="128" height="128">
-</div>
-
 # SNMP Browser Professional
 
 <div align="center">
