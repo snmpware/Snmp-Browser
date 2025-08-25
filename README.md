@@ -63,6 +63,17 @@ Download the latest pre-built executable from the [Releases](https://github.com/
 
 ## 🛠️ Installation from Source
 
+### 📦 SNMP Library Dependency
+
+> **Required Library: [snmpy](https://github.com/JustVugg/snmpy) by [JustVugg](https://github.com/JustVugg)**  
+>
+> This SNMP library is **required to run SNMP Browser Professional**.  
+> It is not available on PyPI and must be installed directly from GitHub:
+
+```bash
+pip install git+https://github.com/JustVugg/snmpy.git
+```
+
 ### Prerequisites
 ```bash
 pip install -r requirements.txt
