@@ -90,9 +90,6 @@ pip install -r requirements.txt
 ```bash
 # For performance graphs
 pip install matplotlib
-
-# For advanced MIB parsing
-pip install pysmi
 ```
 
 ### Running from Source
