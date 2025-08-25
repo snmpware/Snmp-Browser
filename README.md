@@ -1,6 +1,7 @@
 <div align="center">
   <img src="icon.png" alt="SNMP Browser Professional Logo" width="128" height="128">
 </div>
+
 # SNMP Browser Professional
 
 Advanced SNMP browser with modern GUI for network device discovery, monitoring, trap management, and performance analysis.
