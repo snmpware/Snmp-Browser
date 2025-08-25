@@ -276,7 +276,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## 🙏 Acknowledgments
 
-- **SNMP Library**: [snmpy v2.1](https://github.com/JustVugg/snmpy) by [JustVugg](https://github.com/JustVugg)
+- **SNMP Library**: [snmpy](https://github.com/JustVugg/snmpy) by [JustVugg](https://github.com/JustVugg)
 - **GUI Framework**: [tkinter](https://docs.python.org/3/library/tkinter.html)
 - **Icons**: Material Design Icons
 - **Executable Packaging**: [PyInstaller](https://pyinstaller.readthedocs.io/)
