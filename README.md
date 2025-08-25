@@ -4,6 +4,12 @@
 
 # SNMP Browser Professional
 
+<div align="center">
+  <img src="Screenshot.png" alt="Main Window">
+  <p><em>Main SNMP Browser Interface</em></p>
+</div>
+
+
 Advanced SNMP browser with modern GUI for network device discovery, monitoring, trap management, and performance analysis.
 
 ![License](https://img.shields.io/badge/license-GPL%20v3-blue.svg)
