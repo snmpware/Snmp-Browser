@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 SNMP Browser - Production Ready Enhanced
-Browser SNMP professionale con supporto completo v1/v2c/v3
-Include logging, crittografia credenziali, gestione memoria, trap receiver,
-performance metrics, batch operations, MIB compilation e profili multipli
+Professional SNMP Browser with complete v1/v2c/v3 support
+Includes logging, credentials encryption, memory management, trap receiver,
+performance metrics, batch operations, MIB compilation and multiple profiles
 """
 
 import tkinter as tk
@@ -34,11 +34,11 @@ from collections import deque, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import csv
 
-# Importa la libreria SNMPY
+# Import SNMPY library
 from snmpy import *
 import webbrowser
 
-# Per i grafici delle performance
+# For performance graphs
 try:
     import matplotlib
     matplotlib.use('TkAgg')
@@ -49,7 +49,7 @@ except ImportError:
     HAS_MATPLOTLIB = False
 
 class MibParser:
-    """Parser MIB per nomi descrittivi"""
+    """MIB Parser for descriptive names"""
     
     def __init__(self, logger):
         self.logger = logger
@@ -58,7 +58,7 @@ class MibParser:
         self.load_builtin_mibs()
         
     def load_builtin_mibs(self):
-        """Carica MIB builtin per UPS e altri dispositivi comuni"""
+        """Load builtin MIBs for UPS and other common devices"""
         # RFC1628 UPS-MIB
         self.mib_definitions.update({
     # RFC 1628 - UPS MIB Standard
@@ -217,39 +217,39 @@ class MibParser:
 })
         
     def load_mib_file(self, filepath):
-        """Carica un file MIB custom"""
+        """Load a custom MIB file"""
         try:
-            self.logger.info(f"Caricamento MIB da: {filepath}")
+            self.logger.info(f"Loading MIB from: {filepath}")
             
-            # Parser semplice per file MIB in formato testo
+            # Simple parser for MIB text files
             with open(filepath, 'r') as f:
                 content = f.read()
                 
-            # Estrai definizioni OBJECT-TYPE
+            # Extract OBJECT-TYPE definitions
             pattern = r'(\w+)\s+OBJECT-TYPE[\s\S]*?::=\s*\{\s*([\w\s]+)\s+(\d+)\s*\}'
             matches = re.findall(pattern, content)
             
             for name, parent, index in matches:
-                # Costruisci OID completo
+                # Build full OID
                 if parent in self.custom_mibs:
                     parent_oid = self.custom_mibs[parent]
                     full_oid = f"{parent_oid}.{index}"
                     self.custom_mibs[name] = full_oid
                     self.mib_definitions[full_oid] = name
                     
-            self.logger.info(f"Caricate {len(matches)} definizioni dal MIB")
+            self.logger.info(f"Loaded {len(matches)} definitions from MIB")
             return True
             
         except Exception as e:
-            self.logger.error(f"Errore caricamento MIB: {e}")
+            self.logger.error(f"Error loading MIB: {e}")
             return False
             
     def get_name(self, oid):
-        """Ottiene nome descrittivo per OID"""
+        """Get descriptive name for OID"""
         return self.mib_definitions.get(oid, "")
         
     def search_name(self, pattern):
-        """Cerca nomi che matchano pattern"""
+        """Search for names matching pattern"""
         results = {}
         pattern_lower = pattern.lower()
         for oid, name in self.mib_definitions.items():
@@ -258,7 +258,7 @@ class MibParser:
         return results
 
 class TrapReceiver(threading.Thread):
-    """Ricevitore SNMP Trap thread-safe"""
+    """Thread-safe SNMP Trap receiver"""
     
     def __init__(self, port=162, callback=None, logger=None):
         super().__init__(daemon=True)
@@ -271,30 +271,30 @@ class TrapReceiver(threading.Thread):
         self.trap_queue = queue.Queue()
         
     def run(self):
-        """Main loop del trap receiver"""
+        """Main trap receiver loop"""
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             
-            # Bind sulla porta trap
+            # Bind to trap port
             self.socket.bind(('', self.port))
-            self.socket.settimeout(1.0)  # Timeout per permettere stop pulito
+            self.socket.settimeout(1.0)  # Timeout to allow clean stop
             
             self.running = True
-            self.logger.info(f"Trap receiver avviato su porta {self.port}")
+            self.logger.info(f"Trap receiver started on port {self.port}")
             
             while self.running:
                 try:
                     data, addr = self.socket.recvfrom(65535)
                     
-                    # Processa trap
+                    # Process trap
                     trap_info = self.parse_trap(data, addr)
                     self.traps_received += 1
                     
-                    # Aggiungi a coda
+                    # Add to queue
                     self.trap_queue.put(trap_info)
                     
-                    # Callback se definito
+                    # Callback if defined
                     if self.callback:
                         self.callback(trap_info)
                         
@@ -302,53 +302,53 @@ class TrapReceiver(threading.Thread):
                     continue
                 except Exception as e:
                     if self.running:
-                        self.logger.error(f"Errore ricezione trap: {e}")
+                        self.logger.error(f"Error receiving trap: {e}")
                         
         except Exception as e:
-            self.logger.error(f"Errore avvio trap receiver: {e}")
+            self.logger.error(f"Error starting trap receiver: {e}")
         finally:
             if self.socket:
                 self.socket.close()
-            self.logger.info("Trap receiver fermato")
+            self.logger.info("Trap receiver stopped")
             
     def parse_trap(self, data, addr):
-        """Parser migliorato per trap SNMP usando decode_snmp_hex"""
+        """Improved parser for SNMP traps using decode_snmp_hex"""
         trap_info = {
             'timestamp': datetime.now().isoformat(),
             'source': f"{addr[0]}:{addr[1]}",
             'raw_data': data.hex(),
             'size': len(data),
             'type': 'Unknown',
-            'decoded': None  # Nuovo campo per info decodificate
+            'decoded': None  # New field for decoded info
         }
         
         try:
-            # Usa la funzione di decodifica dalla libreria
+            # Use decoding function from library
             from snmpy import decode_snmp_hex
             
-            # Decodifica il trap
+            # Decode the trap
             decoded = decode_snmp_hex(data.hex(), return_dict=True)
             
             if decoded and not decoded.get('error'):
                 trap_info['decoded'] = decoded
                 trap_info['type'] = f"SNMPv{decoded['version']} - {decoded.get('pdu_type', 'Unknown')}"
                 
-                # Se è un trap, aggiungi info sul tipo
+                # If it's a trap, add type info
                 if 'trap_type' in decoded:
                     trap_info['trap_type'] = decoded['trap_type']
                     trap_info['type'] = f"SNMPv{decoded['version']} - {decoded['trap_type']}"
                 
-                # Estrai community
+                # Extract community
                 if decoded.get('community'):
                     trap_info['community'] = decoded['community']
                     
         except Exception as e:
-            self.logger.debug(f"Errore parsing trap avanzato: {e}")
+            self.logger.debug(f"Error in advanced trap parsing: {e}")
             
         return trap_info
         
     def stop(self):
-        """Ferma il receiver"""
+        """Stop the receiver"""
         self.running = False
         if self.socket:
             try:
@@ -357,7 +357,7 @@ class TrapReceiver(threading.Thread):
                 pass
                 
     def get_traps(self, max_count=100):
-        """Ottiene trap dalla coda"""
+        """Get traps from queue"""
         traps = []
         while not self.trap_queue.empty() and len(traps) < max_count:
             try:
@@ -367,7 +367,7 @@ class TrapReceiver(threading.Thread):
         return traps
 
 class PerformanceMonitor:
-    """Monitor performance con metriche"""
+    """Performance monitor with metrics"""
     
     def __init__(self, window_size=100):
         self.window_size = window_size
@@ -391,17 +391,17 @@ class PerformanceMonitor:
         }
         
     def record_query(self, response_time, success):
-        """Registra una query"""
+        """Record a query"""
         now = time.time()
         
-        # Aggiorna contatori
+        # Update counters
         self.current_stats['total_queries'] += 1
         if success:
             self.current_stats['successful_queries'] += 1
         else:
             self.current_stats['failed_queries'] += 1
             
-        # Aggiorna tempi risposta
+        # Update response times
         if response_time:
             self.current_stats['total_response_time'] += response_time
             self.current_stats['min_response_time'] = min(
@@ -413,12 +413,12 @@ class PerformanceMonitor:
                 self.current_stats['successful_queries']
             )
             
-        # Aggiungi a metriche
+        # Add to metrics
         self.metrics['response_times'].append(response_time if response_time else 0)
         self.metrics['success_rate'].append(100 if success else 0)
         self.metrics['timestamps'].append(now)
         
-        # Calcola QPS
+        # Calculate QPS
         if len(self.metrics['timestamps']) > 1:
             time_window = self.metrics['timestamps'][-1] - self.metrics['timestamps'][0]
             if time_window > 0:
@@ -426,7 +426,7 @@ class PerformanceMonitor:
                 self.metrics['queries_per_second'].append(qps)
                 
     def update_system_metrics(self):
-        """Aggiorna metriche di sistema"""
+        """Update system metrics"""
         try:
             process = psutil.Process()
             self.metrics['memory_usage'].append(process.memory_info().rss / 1024 / 1024)
@@ -435,7 +435,7 @@ class PerformanceMonitor:
             pass
             
     def get_summary(self):
-        """Ottiene summary delle performance"""
+        """Get performance summary"""
         if self.current_stats['successful_queries'] == 0:
             success_rate = 0
         else:
@@ -454,7 +454,7 @@ class PerformanceMonitor:
         }
 
 class BatchOperations:
-    """Gestione operazioni batch su host multipli"""
+    """Manage batch operations on multiple hosts"""
     
     def __init__(self, logger, max_workers=5):
         self.logger = logger
@@ -463,7 +463,7 @@ class BatchOperations:
         self.progress_callback = None
         
     def scan_multiple_hosts(self, hosts, oid, snmp_config, progress_callback=None):
-        """Scansiona OID su host multipli"""
+        """Scan OID on multiple hosts"""
         self.results = {}
         self.progress_callback = progress_callback
         total = len(hosts)
@@ -483,7 +483,7 @@ class BatchOperations:
                     self.results[host] = result
                 except Exception as e:
                     self.results[host] = {'error': str(e)}
-                    self.logger.error(f"Errore scan {host}: {e}")
+                    self.logger.error(f"Scan error {host}: {e}")
                     
                 completed += 1
                 if self.progress_callback:
@@ -492,9 +492,9 @@ class BatchOperations:
         return self.results
         
     def _scan_single_host(self, host, oid, config):
-        """Scansiona singolo host"""
+        """Scan single host"""
         try:
-            # Crea client SNMP
+            # Create SNMP client
             if config['version'] == '3':
                 # SNMPv3
                 user = SnmpV3User(
@@ -524,7 +524,7 @@ class BatchOperations:
                     retries=config.get('retries', 3)
                 )
                 
-            # Esegui query
+            # Execute query
             start_time = time.time()
             
             if isinstance(oid, list):
@@ -540,7 +540,7 @@ class BatchOperations:
                     'response_time': time.time() - start_time
                 }
             else:
-                # Singolo OID o walk
+                # Single OID or walk
                 if oid.endswith('*'):
                     # Walk
                     base_oid = oid[:-1]
@@ -554,7 +554,7 @@ class BatchOperations:
                         'response_time': time.time() - start_time
                     }
                 else:
-                    # Get singolo
+                    # Single get
                     result = client.get(oid)
                     if result:
                         return {
@@ -575,7 +575,7 @@ class BatchOperations:
             }
             
     def _format_value(self, value):
-        """Formatta valore SNMP"""
+        """Format SNMP value"""
         if isinstance(value, SnmpOctetString):
             try:
                 return value.value.decode('utf-8', errors='replace')
@@ -587,7 +587,7 @@ class BatchOperations:
             return str(value)
             
     def export_results(self, filepath, format='csv'):
-        """Esporta risultati batch"""
+        """Export batch results"""
         if format == 'csv':
             with open(filepath, 'w', newline='') as f:
                 writer = csv.writer(f)
@@ -619,7 +619,7 @@ class BatchOperations:
                 json.dump(self.results, f, indent=2)
 
 class ProfileManager:
-    """Gestione profili di configurazione"""
+    """Configuration profile management"""
     
     def __init__(self, profiles_file="snmp_profiles.json", credential_manager=None):
         self.profiles_file = profiles_file
@@ -627,7 +627,7 @@ class ProfileManager:
         self.profiles = self.load_profiles()
         
     def load_profiles(self):
-        """Carica profili salvati"""
+        """Load saved profiles"""
         try:
             if os.path.exists(self.profiles_file):
                 with open(self.profiles_file, 'r') as f:
@@ -637,7 +637,7 @@ class ProfileManager:
         return {}
         
     def save_profiles(self):
-        """Salva profili su file"""
+        """Save profiles to file"""
         try:
             with open(self.profiles_file, 'w') as f:
                 json.dump(self.profiles, f, indent=2)
@@ -646,8 +646,8 @@ class ProfileManager:
             return False
             
     def add_profile(self, name, config):
-        """Aggiunge nuovo profilo"""
-        # Cripta password se presenti
+        """Add new profile"""
+        # Encrypt passwords if present
         if self.credential_manager:
             if 'community' in config:
                 config['community_encrypted'] = self.credential_manager.encrypt_password(
@@ -663,13 +663,13 @@ class ProfileManager:
         self.save_profiles()
         
     def get_profile(self, name):
-        """Ottiene profilo decriptato"""
+        """Get decrypted profile"""
         if name not in self.profiles:
             return None
             
         config = self.profiles[name].copy()
         
-        # Decripta password
+        # Decrypt passwords
         if self.credential_manager:
             if 'community_encrypted' in config:
                 config['community'] = self.credential_manager.decrypt_password(
@@ -684,7 +684,7 @@ class ProfileManager:
         return config
         
     def delete_profile(self, name):
-        """Elimina profilo"""
+        """Delete profile"""
         if name in self.profiles:
             del self.profiles[name]
             self.save_profiles()
@@ -692,11 +692,11 @@ class ProfileManager:
         return False
         
     def list_profiles(self):
-        """Lista nomi profili"""
+        """List profile names"""
         return list(self.profiles.keys())
 
 class SecureCredentialManager:
-    """Gestisce il salvataggio sicuro delle credenziali"""
+    """Manages secure credential storage"""
 
     def __init__(self, app_name="SNMPBrowser"):
         self.app_name = app_name
@@ -704,7 +704,7 @@ class SecureCredentialManager:
         self.cipher = self._get_or_create_cipher()
 
     def _get_or_create_cipher(self):
-        """Ottiene o crea chiave di crittografia"""
+        """Get or create encryption key"""
         if os.path.exists(self.key_file):
             with open(self.key_file, 'rb') as f:
                 key = f.read()
@@ -712,20 +712,20 @@ class SecureCredentialManager:
             key = Fernet.generate_key()
             with open(self.key_file, 'wb') as f:
                 f.write(key)
-            # Proteggi il file su sistemi Unix
+            # Protect file on Unix systems
             if hasattr(os, 'chmod'):
                 os.chmod(self.key_file, 0o600)
 
         return Fernet(key)
 
     def encrypt_password(self, password: str) -> str:
-        """Cripta una password"""
+        """Encrypt a password"""
         if not password:
             return ""
         return self.cipher.encrypt(password.encode()).decode()
 
     def decrypt_password(self, encrypted: str) -> str:
-        """Decripta una password"""
+        """Decrypt a password"""
         if not encrypted:
             return ""
         try:
@@ -734,18 +734,18 @@ class SecureCredentialManager:
             return ""
 
     def secure_delete(self, data: str):
-        """Cancellazione sicura dalla memoria"""
+        """Secure memory deletion"""
         if data:
-            # Sovrascrive la stringa in memoria
+            # Overwrite string in memory
             data_len = len(data)
             random_data = secrets.token_bytes(data_len)
-            # Forza garbage collection
+            # Force garbage collection
             del data
             gc.collect()
 
 
 class MemoryLimitedScanner:
-    """Scanner con limite di memoria"""
+    """Memory-limited scanner"""
 
     def __init__(self, max_results=10000, max_memory_mb=500):
         self.max_results = max_results
@@ -754,27 +754,27 @@ class MemoryLimitedScanner:
         self.start_memory = psutil.Process().memory_info().rss / 1024 / 1024
 
     def check_limits(self) -> Tuple[bool, str]:
-        """Controlla limiti memoria e risultati"""
-        # Check numero risultati
+        """Check memory and results limits"""
+        # Check results count
         if self.results_count >= self.max_results:
-            return False, f"Limite risultati raggiunto ({self.max_results})"
+            return False, f"Results limit reached ({self.max_results})"
 
-        # Check memoria
+        # Check memory
         current_memory = psutil.Process().memory_info().rss / 1024 / 1024
         memory_used = current_memory - self.start_memory
 
         if memory_used > self.max_memory_mb:
-            return False, f"Limite memoria raggiunto ({self.max_memory_mb}MB)"
+            return False, f"Memory limit reached ({self.max_memory_mb}MB)"
 
         return True, ""
 
     def increment(self):
-        """Incrementa contatore risultati"""
+        """Increment results counter"""
         self.results_count += 1
 
 
 class SnmpBrowserGUI:
-    """Interfaccia grafica SNMP Browser Production Ready Enhanced"""
+    """SNMP Browser Production Ready Enhanced GUI"""
 
     def __init__(self, root):
         self.root = root
@@ -785,10 +785,10 @@ class SnmpBrowserGUI:
         # Setup logging
         self.setup_logging()
         self.logger.info("=" * 60)
-        self.logger.info("Avvio SNMP Browser")
-        self.logger.info(f"Sistema: {sys.platform}, Python: {sys.version}")
+        self.logger.info("Starting SNMP Browser")
+        self.logger.info(f"System: {sys.platform}, Python: {sys.version}")
 
-        # Manager componenti
+        # Component managers
         self.credential_manager = SecureCredentialManager()
         self.profile_manager = ProfileManager(credential_manager=self.credential_manager)
         self.mib_parser = MibParser(self.logger)
@@ -796,7 +796,7 @@ class SnmpBrowserGUI:
         self.batch_operations = BatchOperations(self.logger)
         self.trap_receiver = None
         
-        # Variabili configurazione base
+        # Base configuration variables
         self.host_var = tk.StringVar(value="192.168.1.1")
         self.community_var = tk.StringVar(value="public")
         self.port_var = tk.StringVar(value="161")
@@ -805,7 +805,7 @@ class SnmpBrowserGUI:
         self.retries_var = tk.StringVar(value="3")
         self.current_profile_var = tk.StringVar(value="Default")
 
-        # Variabili SNMPv3
+        # SNMPv3 variables
         self.v3_user_var = tk.StringVar(value="")
         self.v3_auth_protocol_var = tk.StringVar(value="noAuth")
         self.v3_auth_password_var = tk.StringVar(value="")
@@ -814,7 +814,7 @@ class SnmpBrowserGUI:
         self.v3_show_passwords = tk.BooleanVar(value=False)
         self.v3_engine_id_var = tk.StringVar(value="")
 
-        # Variabili di stato
+        # State variables
         self.scanning = False
         self.scan_thread = None
         self.client = None
@@ -829,50 +829,50 @@ class SnmpBrowserGUI:
         self.trap_receiver_enabled = tk.BooleanVar()
         self.received_traps = []
 
-        # Limiti memoria
+        # Memory limits
         self.max_results_var = tk.StringVar(value="10000")
         self.max_memory_var = tk.StringVar(value="500")
         self.memory_scanner = None
 
-        # File configurazione
+        # Configuration files
         self.config_file = "snmp_browser_config.json"
         self.saved_values_file = "snmp_browser_saved.json"
 
-        # Dizionario OID
+        # OID dictionary
         self.oid_names = self._build_oid_names_dictionary()
 
-        # Crea interfaccia
+        # Create interface
         self.create_widgets()
         self.create_menu()
 
-        # Carica configurazione
+        # Load configuration
         self.load_config()
         self.load_saved_values()
 
-        # Bind eventi
+        # Bind events
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.version_var.trace('w', self.on_version_change)
 
-        # Monitor memoria e performance
+        # Memory and performance monitor
         self.start_memory_monitor()
         self.update_performance_metrics()
 
-        self.logger.info("Inizializzazione completata")
+        self.logger.info("Initialization complete")
 
     def setup_logging(self):
-        """Configura logging su file con rotazione"""
+        """Configure file logging with rotation"""
         log_dir = "logs"
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
 
-        # Nome file con data
+        # Log filename with date
         log_file = os.path.join(log_dir, f"snmp_browser_{datetime.now().strftime('%Y%m%d')}.log")
 
-        # Configura logger
+        # Configure logger
         self.logger = logging.getLogger('SNMPBrowser')
         self.logger.setLevel(logging.DEBUG)
 
-        # File handler con rotazione
+        # File handler with rotation
         from logging.handlers import RotatingFileHandler
         file_handler = RotatingFileHandler(
             log_file,
@@ -885,40 +885,40 @@ class SnmpBrowserGUI:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
 
-        # Formato
+        # Format
         formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s - %(message)s'
         )
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
 
-        # Aggiungi handlers
+        # Add handlers
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
 
     def send_trap(self):
-        """Invia un trap SNMP"""
+        """Send an SNMP trap"""
         try:
             from snmpy import SnmpTrapSender, SnmpVersion, SnmpV3User, SnmpV3AuthProtocol
             from snmpy import SnmpOctetString, SnmpInteger, SnmpObjectIdentifier
             
-            # Ottieni parametri
+            # Get parameters
             host = self.trap_dest_host_var.get()
             port = int(self.trap_dest_port_var.get())
             version_str = self.trap_version_var.get()
             community = self.trap_community_var.get()
             
-            # Determina versione
+            # Determine version
             if version_str == "1":
                 version = SnmpVersion.V1
             elif version_str == "3":
                 version = SnmpVersion.V3
-                messagebox.showwarning("SNMPv3", "SNMPv3 trap non ancora implementato in GUI")
+                messagebox.showwarning("SNMPv3", "SNMPv3 trap not yet implemented in GUI")
                 return
             else:
                 version = SnmpVersion.V2C
             
-            # Crea sender
+            # Create sender
             sender = SnmpTrapSender(
                 trap_host=host,
                 trap_port=port,
@@ -926,7 +926,7 @@ class SnmpBrowserGUI:
                 version=version
             )
             
-            # Invia in base al tipo
+            # Send based on type
             trap_type = self.trap_type_var.get()
             success = False
             
@@ -980,7 +980,7 @@ class SnmpBrowserGUI:
                         oid = oid.strip()
                         value = value.strip()
                         
-                        # Determina tipo valore
+                        # Determine value type
                         if value.isdigit():
                             varbinds.append((oid, SnmpInteger(int(value))))
                         else:
@@ -989,24 +989,24 @@ class SnmpBrowserGUI:
                 custom_oid = self.trap_custom_oid_var.get()
                 success = sender.send_v2c_trap(custom_oid, varbinds=varbinds)
             
-            # Mostra risultato
+            # Show result
             if success:
-                self.trap_send_status.config(text=f"Trap inviato a {host}:{port}", foreground="green")
-                self.logger.info(f"Trap {trap_type} inviato con successo a {host}:{port}")
+                self.trap_send_status.config(text=f"Trap sent to {host}:{port}", foreground="green")
+                self.logger.info(f"Trap {trap_type} sent successfully to {host}:{port}")
                 
-                # Se il receiver è attivo sulla stessa porta, dovremmo vederlo
+                # If receiver is active on same port, we should see it
                 if self.trap_receiver and self.trap_receiver.running and host == "localhost":
-                    self.status_var.set(f"Trap {trap_type} inviato (controlla receiver)")
+                    self.status_var.set(f"Trap {trap_type} sent (check receiver)")
             else:
-                self.trap_send_status.config(text="Errore invio trap", foreground="red")
-                self.logger.error(f"Errore invio trap {trap_type}")
+                self.trap_send_status.config(text="Trap sending error", foreground="red")
+                self.logger.error(f"Trap sending error {trap_type}")
                 
         except Exception as e:
-            messagebox.showerror("Errore", f"Errore invio trap:\n{str(e)}")
-            self.logger.error(f"Errore invio trap: {e}")
+            messagebox.showerror("Error", f"Trap sending error:\n{str(e)}")
+            self.logger.error(f"Trap sending error: {e}")
 
     def send_trap_loop(self):
-        """Invia 5 trap di test con delay"""
+        """Send 5 test traps with delay"""
         def send_loop():
             for i in range(5):
                 self.trap_message_var.set(f"Test trap #{i+1} - {time.strftime('%H:%M:%S')}")
@@ -1014,17 +1014,17 @@ class SnmpBrowserGUI:
                 if i < 4:
                     time.sleep(2)
         
-        # Esegui in thread separato
+        # Run in separate thread
         threading.Thread(target=send_loop, daemon=True).start()
 
     def show_trap_templates(self):
-        """Mostra template di trap predefiniti"""
+        """Show predefined trap templates"""
         template_window = tk.Toplevel(self.root)
         template_window.title("Trap Templates")
         template_window.geometry("600x400")
         template_window.transient(self.root)
         
-        # Lista template
+        # Template list
         templates = [
             {
                 'name': 'UPS Power Failure',
@@ -1049,11 +1049,11 @@ class SnmpBrowserGUI:
             {
                 'name': 'Test Notification',
                 'type': 'test',
-                'params': {'message': 'Sistema operativo - Test periodico'}
+                'params': {'message': 'Operating System - Periodic Test'}
             }
         ]
         
-        # Lista
+        # List
         list_frame = ttk.Frame(template_window)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
@@ -1068,7 +1068,7 @@ class SnmpBrowserGUI:
             if selection:
                 template = templates[selection[0]]
                 
-                # Applica template
+                # Apply template
                 self.trap_type_var.set(template['type'])
                 
                 if template['type'] == 'test':
@@ -1083,45 +1083,45 @@ class SnmpBrowserGUI:
                 
                 template_window.destroy()
         
-        # Pulsanti
+        # Buttons
         btn_frame = ttk.Frame(template_window)
         btn_frame.pack(pady=10)
         
-        ttk.Button(btn_frame, text="Applica", command=apply_template).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Chiudi", command=template_window.destroy).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Apply", command=apply_template).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Close", command=template_window.destroy).pack(side=tk.LEFT, padx=5)
 
     def start_memory_monitor(self):
-        """Monitora l'uso della memoria"""
+        """Monitor memory usage"""
 
         def monitor():
             process = psutil.Process()
             memory_mb = process.memory_info().rss / 1024 / 1024
 
-            # Avvisa se supera soglia
+            # Alert if exceeds threshold
             if memory_mb > 800:
-                self.logger.warning(f"Uso memoria elevato: {memory_mb:.1f}MB")
+                self.logger.warning(f"High memory usage: {memory_mb:.1f}MB")
                 self.root.after(0, lambda: self.status_var.set(
-                    f"Memoria elevata: {memory_mb:.1f}MB"))
+                    f"High memory usage: {memory_mb:.1f}MB"))
 
-            # Ricontrolla ogni 30 secondi
+            # Recheck every 30 seconds
             self.root.after(30000, monitor)
 
-        # Avvia monitor
+        # Start monitor
         self.root.after(5000, monitor)
 
     def update_performance_metrics(self):
-        """Aggiorna metriche performance periodicamente"""
+        """Update performance metrics periodically"""
         self.performance_monitor.update_system_metrics()
         
-        # Aggiorna display se tab performance è visibile
+        # Update display if performance tab is visible
         if hasattr(self, 'performance_tab_active') and self.performance_tab_active:
             self.update_performance_display()
             
-        # Richiama ogni 2 secondi
+        # Call again every 2 seconds
         self.root.after(2000, self.update_performance_metrics)
 
     def _build_oid_names_dictionary(self):
-        """Costruisce dizionario OID esteso con SNMPv3 e UPS"""
+        """Build extended OID dictionary with SNMPv3 and UPS"""
         base_dict = {
             "1": "iso",
             "1.3": "org",
@@ -1203,81 +1203,81 @@ class SnmpBrowserGUI:
             "1.3.6.1.4.1.3808": "cyberPower",
         }
         
-        # Aggiungi definizioni MIB parser
+        # Add MIB parser definitions
         base_dict.update(self.mib_parser.mib_definitions)
         
         return base_dict
 
     def create_menu(self):
-        """Crea menu principale con nuove opzioni"""
+        """Create main menu with new options"""
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
 
-        # Menu File
+        # File Menu
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Salva Configurazione", command=self.save_config, accelerator="Ctrl+S")
-        file_menu.add_command(label="Carica Configurazione", command=self.load_config_dialog, accelerator="Ctrl+O")
+        file_menu.add_command(label="Save Configuration", command=self.save_config, accelerator="Ctrl+S")
+        file_menu.add_command(label="Load Configuration", command=self.load_config_dialog, accelerator="Ctrl+O")
         file_menu.add_separator()
-        file_menu.add_command(label="Gestione Profili", command=self.show_profile_manager)
+        file_menu.add_command(label="Profile Manager", command=self.show_profile_manager)
         file_menu.add_separator()
-        file_menu.add_command(label="Esporta Risultati", command=self.export_results, accelerator="Ctrl+E")
+        file_menu.add_command(label="Export Results", command=self.export_results, accelerator="Ctrl+E")
         file_menu.add_separator()
-        file_menu.add_command(label="Visualizza Log", command=self.show_log_viewer)
+        file_menu.add_command(label="View Logs", command=self.show_log_viewer)
         file_menu.add_separator()
-        file_menu.add_command(label="Esci", command=self.on_closing, accelerator="Ctrl+Q")
+        file_menu.add_command(label="Exit", command=self.on_closing, accelerator="Ctrl+Q")
 
-        # Menu Tools
+        # Tools Menu
         tools_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Tools", menu=tools_menu)
-        tools_menu.add_command(label="Test Connessione", command=self.test_connection, accelerator="Ctrl+T")
-        tools_menu.add_command(label="SNMP Walk Completo", command=self.full_walk)
-        tools_menu.add_command(label="Operazioni Batch", command=self.show_batch_operations)
+        tools_menu.add_command(label="Test Connection", command=self.test_connection, accelerator="Ctrl+T")
+        tools_menu.add_command(label="Full SNMP Walk", command=self.full_walk)
+        tools_menu.add_command(label="Batch Operations", command=self.show_batch_operations)
         tools_menu.add_separator()
         tools_menu.add_command(label="Trap Receiver", command=self.toggle_trap_receiver)
         tools_menu.add_command(label="Performance Monitor", command=self.show_performance_window)
         tools_menu.add_separator()
-        tools_menu.add_command(label="Carica MIB", command=self.load_mib_file)
-        tools_menu.add_command(label="Cerca in MIB", command=self.search_mib_definitions)
+        tools_menu.add_command(label="Load MIB", command=self.load_mib_file)
+        tools_menu.add_command(label="Search MIB", command=self.search_mib_definitions)
         tools_menu.add_separator()
-        tools_menu.add_command(label="Decodifica Hex SNMP", command=self.show_hex_decoder)
+        tools_menu.add_command(label="SNMP Hex Decoder", command=self.show_hex_decoder)
         tools_menu.add_separator()
-        tools_menu.add_command(label="Wizard SNMPv3", command=self.show_snmpv3_wizard)
-        tools_menu.add_command(label="Scopri Engine ID", command=self.discover_engine_id)
+        tools_menu.add_command(label="SNMPv3 Wizard", command=self.show_snmpv3_wizard)
+        tools_menu.add_command(label="Discover Engine ID", command=self.discover_engine_id)
         tools_menu.add_separator()
-        tools_menu.add_command(label="Pulisci Cache", command=self.clear_cache)
-        tools_menu.add_command(label="Impostazioni", command=self.show_settings)
+        tools_menu.add_command(label="Clear Cache", command=self.clear_cache)
+        tools_menu.add_command(label="Settings", command=self.show_settings)
 
-        # Menu Help
+        # Help Menu
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="Guida", command=self.show_help, accelerator="F1")
+        help_menu.add_command(label="Help", command=self.show_help, accelerator="F1")
         help_menu.add_command(label="Shortcuts", command=self.show_shortcuts)
         help_menu.add_command(label="Debug Info", command=self.show_debug_info)
         help_menu.add_separator()
-        help_menu.add_command(label="Info", command=self.show_about)
+        help_menu.add_command(label="About", command=self.show_about)
 
 
     def show_hex_decoder(self):
-        """Mostra dialog per decodifica hex manuale"""
+        """Show dialog for manual hex decoding"""
         decoder_window = tk.Toplevel(self.root)
         decoder_window.title("SNMP Hex Decoder")
         decoder_window.geometry("900x700")
         decoder_window.transient(self.root)
         
         # Input
-        input_frame = ttk.LabelFrame(decoder_window, text="Hex Input (incolla qui)")
+        input_frame = ttk.LabelFrame(decoder_window, text="Hex Input (paste here)")
         input_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         input_text = tk.Text(input_frame, height=8, font=('Courier', 10))
         input_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Esempio
-        input_text.insert(tk.END, "# Incolla qui l'hex del pacchetto SNMP\n")
-        input_text.insert(tk.END, "# Esempio: 3081a202010104067075626c6963a78194...")
+        # Example
+        input_text.insert(tk.END, "# Paste SNMP packet hex here\n")
+        input_text.insert(tk.END, "# Example: 3081a202010104067075626c6963a78194...")
         
         # Output
-        output_frame = ttk.LabelFrame(decoder_window, text="Risultato Decodifica")
+        output_frame = ttk.LabelFrame(decoder_window, text="Decoding Result")
         output_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
         
         output_text = tk.Text(output_frame, height=15, font=('Courier', 10))
@@ -1288,17 +1288,17 @@ class SnmpBrowserGUI:
             import io
             import sys
             
-            # Ottieni hex
+            # Get hex
             hex_data = input_text.get(1.0, tk.END).strip()
-            # Rimuovi commenti
+            # Remove comments
             hex_data = '\n'.join(line for line in hex_data.split('\n') 
                                 if not line.strip().startswith('#'))
             
             if not hex_data:
-                messagebox.showwarning("Avviso", "Inserisci dati hex!")
+                messagebox.showwarning("Warning", "Please enter hex data!")
                 return
             
-            # Cattura output
+            # Capture output
             old_stdout = sys.stdout
             sys.stdout = buffer = io.StringIO()
             
@@ -1306,37 +1306,37 @@ class SnmpBrowserGUI:
                 decode_snmp_hex(hex_data)
                 output = buffer.getvalue()
             except Exception as e:
-                output = f"Errore decodifica:\n{str(e)}"
+                output = f"Decoding error:\n{str(e)}"
             finally:
                 sys.stdout = old_stdout
             
-            # Mostra risultato
+            # Show result
             output_text.config(state=tk.NORMAL)
             output_text.delete(1.0, tk.END)
             output_text.insert(tk.END, output)
             output_text.config(state=tk.DISABLED)
         
-        # Pulsanti
+        # Buttons
         btn_frame = ttk.Frame(decoder_window)
         btn_frame.pack(pady=10)
         
-        ttk.Button(btn_frame, text="Decodifica", command=decode,
+        ttk.Button(btn_frame, text="Decode", command=decode,
                 style='Accent.TButton').pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Pulisci", 
+        ttk.Button(btn_frame, text="Clear", 
                 command=lambda: input_text.delete(1.0, tk.END)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Chiudi", 
+        ttk.Button(btn_frame, text="Close", 
                 command=decoder_window.destroy).pack(side=tk.LEFT, padx=5)
 
     def create_widgets(self):
-        """Crea tutti i widget"""
-        # Frame principale
+        """Create all widgets"""
+        # Main frame
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Frame configurazione
+        # Configuration frame
         self.create_config_frame(main_frame)
 
-        # Notebook per visualizzazioni
+        # Notebook for views
         self.notebook = ttk.Notebook(main_frame)
         self.notebook.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
 
@@ -1347,30 +1347,30 @@ class SnmpBrowserGUI:
         self.create_trap_tab()
         self.create_performance_tab()
 
-        # Frame stato
+        # Status frame
         self.create_status_frame(main_frame)
 
     def create_config_frame(self, parent):
-        """Frame configurazione con profili"""
-        config_frame = ttk.LabelFrame(parent, text="Configurazione SNMP")
+        """Configuration frame with profiles"""
+        config_frame = ttk.LabelFrame(parent, text="SNMP Configuration")
         config_frame.pack(fill=tk.X, pady=(0, 5))
 
-        # Prima riga - Profili
+        # First row - Profiles
         profile_row = ttk.Frame(config_frame)
         profile_row.pack(fill=tk.X, padx=5, pady=5)
         
-        ttk.Label(profile_row, text="Profilo:").pack(side=tk.LEFT)
+        ttk.Label(profile_row, text="Profile:").pack(side=tk.LEFT)
         self.profile_combo = ttk.Combobox(profile_row, textvariable=self.current_profile_var,
                                           width=15, state='readonly')
         self.profile_combo.pack(side=tk.LEFT, padx=(5, 10))
         self.profile_combo.bind('<<ComboboxSelected>>', self.on_profile_selected)
         
-        ttk.Button(profile_row, text="Salva", command=self.save_current_profile).pack(side=tk.LEFT, padx=2)
-        ttk.Button(profile_row, text="Gestisci", command=self.show_profile_manager).pack(side=tk.LEFT, padx=2)
+        ttk.Button(profile_row, text="Save", command=self.save_current_profile).pack(side=tk.LEFT, padx=2)
+        ttk.Button(profile_row, text="Manage", command=self.show_profile_manager).pack(side=tk.LEFT, padx=2)
         
         self.update_profile_list()
 
-        # Seconda riga
+        # Second row
         row1 = ttk.Frame(config_frame)
         row1.pack(fill=tk.X, padx=5, pady=5)
 
@@ -1378,40 +1378,40 @@ class SnmpBrowserGUI:
         self.host_entry = ttk.Entry(row1, textvariable=self.host_var, width=15)
         self.host_entry.pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Label(row1, text="Porta:").pack(side=tk.LEFT)
+        ttk.Label(row1, text="Port:").pack(side=tk.LEFT)
         self.port_entry = ttk.Entry(row1, textvariable=self.port_var, width=6)
         self.port_entry.pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Label(row1, text="Versione:").pack(side=tk.LEFT)
+        ttk.Label(row1, text="Version:").pack(side=tk.LEFT)
         version_combo = ttk.Combobox(row1, textvariable=self.version_var, width=5,
                                      values=["1", "2c", "3"], state='readonly')
         version_combo.pack(side=tk.LEFT, padx=(5, 10))
 
-        # Community per v1/v2c
+        # Community for v1/v2c
         self.v1v2_frame = ttk.Frame(row1)
         self.v1v2_frame.pack(side=tk.LEFT, padx=(10, 0))
 
         ttk.Label(self.v1v2_frame, text="Community:").pack(side=tk.LEFT)
         ttk.Entry(self.v1v2_frame, textvariable=self.community_var, width=10).pack(side=tk.LEFT, padx=(5, 10))
 
-        # Terza riga
+        # Third row
         row2 = ttk.Frame(config_frame)
         row2.pack(fill=tk.X, padx=5, pady=(0, 5))
 
         ttk.Label(row2, text="Timeout:").pack(side=tk.LEFT)
         ttk.Entry(row2, textvariable=self.timeout_var, width=6).pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Label(row2, text="Retry:").pack(side=tk.LEFT)
+        ttk.Label(row2, text="Retries:").pack(side=tk.LEFT)
         ttk.Entry(row2, textvariable=self.retries_var, width=6).pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Checkbutton(row2, text="Scansione Estesa",
+        ttk.Checkbutton(row2, text="Extended Scan",
                         variable=self.extended_scan_var).pack(side=tk.LEFT, padx=(20, 10))
 
-        # Pulsanti
+        # Buttons
         btn_frame = ttk.Frame(row2)
         btn_frame.pack(side=tk.RIGHT, padx=5)
 
-        self.scan_btn = ttk.Button(btn_frame, text="Avvia Scansione", command=self.start_scan)
+        self.scan_btn = ttk.Button(btn_frame, text="Start Scan", command=self.start_scan)
         self.scan_btn.pack(side=tk.LEFT, padx=2)
 
         self.stop_btn = ttk.Button(btn_frame, text="Stop", command=self.stop_scan, state=tk.DISABLED)
@@ -1420,10 +1420,10 @@ class SnmpBrowserGUI:
         ttk.Button(btn_frame, text="Test", command=self.test_connection).pack(side=tk.LEFT, padx=2)
         ttk.Button(btn_frame, text="Batch", command=self.show_batch_operations).pack(side=tk.LEFT, padx=2)
 
-        # Frame SNMPv3
-        self.v3_frame = ttk.LabelFrame(config_frame, text="Configurazione SNMPv3")
+        # SNMPv3 Frame
+        self.v3_frame = ttk.LabelFrame(config_frame, text="SNMPv3 Configuration")
 
-        # Prima riga v3
+        # First v3 row
         v3_row1 = ttk.Frame(self.v3_frame)
         v3_row1.pack(fill=tk.X, padx=5, pady=5)
 
@@ -1441,7 +1441,7 @@ class SnmpBrowserGUI:
                                          width=15, show="*")
         self.auth_pass_entry.pack(side=tk.LEFT, padx=(5, 10))
 
-        # Seconda riga v3
+        # Second v3 row
         v3_row2 = ttk.Frame(self.v3_frame)
         v3_row2.pack(fill=tk.X, padx=5, pady=(0, 5))
 
@@ -1456,7 +1456,7 @@ class SnmpBrowserGUI:
                                          width=15, show="*")
         self.priv_pass_entry.pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Checkbutton(v3_row2, text="Mostra",
+        ttk.Checkbutton(v3_row2, text="Show",
                         variable=self.v3_show_passwords,
                         command=self.toggle_password_visibility).pack(side=tk.LEFT, padx=(10, 5))
 
@@ -1467,40 +1467,40 @@ class SnmpBrowserGUI:
                    command=self.test_snmpv3_connection).pack(side=tk.LEFT, padx=5)
 
     def create_trap_tab(self):
-        """Tab per trap receiver E SENDER"""
+        """Tab for trap receiver AND SENDER"""
         trap_frame = ttk.Frame(self.notebook)
         self.notebook.add(trap_frame, text="Trap Manager")
         
-        # Notebook interno per Receiver e Sender
+        # Internal notebook for Receiver and Sender
         trap_notebook = ttk.Notebook(trap_frame)
         trap_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # === TAB RECEIVER ===
+        # === RECEIVER TAB ===
         receiver_frame = ttk.Frame(trap_notebook)
         trap_notebook.add(receiver_frame, text="Trap Receiver")
         
-        # Controlli Receiver (codice esistente)
-        control_frame = ttk.LabelFrame(receiver_frame, text="Controlli Trap Receiver")
+        # Receiver controls (existing code)
+        control_frame = ttk.LabelFrame(receiver_frame, text="Trap Receiver Controls")
         control_frame.pack(fill=tk.X, padx=5, pady=5)
         
         controls = ttk.Frame(control_frame)
         controls.pack(padx=10, pady=10)
         
-        self.trap_status_label = ttk.Label(controls, text="Status: Inattivo")
+        self.trap_status_label = ttk.Label(controls, text="Status: Inactive")
         self.trap_status_label.pack(side=tk.LEFT, padx=(0, 20))
         
-        self.trap_toggle_btn = ttk.Button(controls, text="Avvia Receiver",
+        self.trap_toggle_btn = ttk.Button(controls, text="Start Receiver",
                                         command=self.toggle_trap_receiver)
         self.trap_toggle_btn.pack(side=tk.LEFT, padx=5)
         
-        ttk.Button(controls, text="Pulisci", command=self.clear_traps).pack(side=tk.LEFT, padx=5)
-        ttk.Button(controls, text="Esporta", command=self.export_traps).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls, text="Clear", command=self.clear_traps).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls, text="Export", command=self.export_traps).pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(controls, text="Porta:").pack(side=tk.LEFT, padx=(20, 5))
+        ttk.Label(controls, text="Port:").pack(side=tk.LEFT, padx=(20, 5))
         self.trap_port_var = tk.StringVar(value="162")
         ttk.Entry(controls, textvariable=self.trap_port_var, width=6).pack(side=tk.LEFT)
         
-        # TreeView per trap ricevuti
+        # TreeView for received traps
         tree_frame = ttk.Frame(receiver_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
@@ -1520,18 +1520,18 @@ class SnmpBrowserGUI:
         self.trap_tree.bind("<Double-1>", self.on_trap_double_click)
         
         # Info frame
-        info_frame = ttk.LabelFrame(receiver_frame, text="Statistiche")
+        info_frame = ttk.LabelFrame(receiver_frame, text="Statistics")
         info_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        self.trap_stats_label = ttk.Label(info_frame, text="Trap ricevuti: 0")
+        self.trap_stats_label = ttk.Label(info_frame, text="Traps received: 0")
         self.trap_stats_label.pack(padx=10, pady=5)
         
-        # === TAB SENDER ===
+        # === SENDER TAB ===
         sender_frame = ttk.Frame(trap_notebook)
         trap_notebook.add(sender_frame, text="Trap Sender")
         
-        # Configurazione destinazione
-        dest_frame = ttk.LabelFrame(sender_frame, text="Destinazione Trap")
+        # Destination configuration
+        dest_frame = ttk.LabelFrame(sender_frame, text="Trap Destination")
         dest_frame.pack(fill=tk.X, padx=5, pady=5)
         
         dest_controls = ttk.Frame(dest_frame)
@@ -1541,11 +1541,11 @@ class SnmpBrowserGUI:
         self.trap_dest_host_var = tk.StringVar(value="localhost")
         ttk.Entry(dest_controls, textvariable=self.trap_dest_host_var, width=20).grid(row=0, column=1, padx=5)
         
-        ttk.Label(dest_controls, text="Porta:").grid(row=0, column=2, sticky=tk.W, padx=5)
+        ttk.Label(dest_controls, text="Port:").grid(row=0, column=2, sticky=tk.W, padx=5)
         self.trap_dest_port_var = tk.StringVar(value="162")
         ttk.Entry(dest_controls, textvariable=self.trap_dest_port_var, width=8).grid(row=0, column=3, padx=5)
         
-        ttk.Label(dest_controls, text="Versione:").grid(row=1, column=0, sticky=tk.W, padx=5)
+        ttk.Label(dest_controls, text="Version:").grid(row=1, column=0, sticky=tk.W, padx=5)
         self.trap_version_var = tk.StringVar(value="2c")
         ttk.Combobox(dest_controls, textvariable=self.trap_version_var, 
                     values=["1", "2c", "3"], state='readonly', width=5).grid(row=1, column=1, padx=5, sticky=tk.W)
@@ -1554,14 +1554,14 @@ class SnmpBrowserGUI:
         self.trap_community_var = tk.StringVar(value="public")
         ttk.Entry(dest_controls, textvariable=self.trap_community_var, width=15).grid(row=1, column=3, padx=5)
         
-        # Tipo di trap
-        trap_type_frame = ttk.LabelFrame(sender_frame, text="Tipo di Trap")
+        # Trap type
+        trap_type_frame = ttk.LabelFrame(sender_frame, text="Trap Type")
         trap_type_frame.pack(fill=tk.X, padx=5, pady=5)
         
         trap_type_controls = ttk.Frame(trap_type_frame)
         trap_type_controls.pack(padx=10, pady=10)
         
-        # Radio buttons per tipo trap
+        # Radio buttons for trap type
         self.trap_type_var = tk.StringVar(value="test")
         
         trap_types = [
@@ -1580,23 +1580,23 @@ class SnmpBrowserGUI:
             ttk.Radiobutton(trap_type_controls, text=text, variable=self.trap_type_var, 
                         value=value).grid(row=i//3, column=i%3, sticky=tk.W, padx=10, pady=2)
         
-        # Frame per parametri specifici
-        params_frame = ttk.LabelFrame(sender_frame, text="Parametri Trap")
+        # Frame for specific parameters
+        params_frame = ttk.LabelFrame(sender_frame, text="Trap Parameters")
         params_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Notebook per diversi tipi di parametri
+        # Notebook for different parameter types
         self.params_notebook = ttk.Notebook(params_frame)
         self.params_notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Tab parametri test
+        # Test parameters tab
         test_params = ttk.Frame(self.params_notebook)
         self.params_notebook.add(test_params, text="Test/Generic")
         
-        ttk.Label(test_params, text="Messaggio:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Label(test_params, text="Message:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
         self.trap_message_var = tk.StringVar(value="Test trap from SNMP Browser")
         ttk.Entry(test_params, textvariable=self.trap_message_var, width=50).grid(row=0, column=1, padx=5, pady=5)
         
-        # Tab parametri interfaccia
+        # Interface parameters tab
         if_params = ttk.Frame(self.params_notebook)
         self.params_notebook.add(if_params, text="Interface")
         
@@ -1608,7 +1608,7 @@ class SnmpBrowserGUI:
         self.trap_if_name_var = tk.StringVar(value="eth0")
         ttk.Entry(if_params, textvariable=self.trap_if_name_var, width=30).grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
         
-        # Tab parametri UPS
+        # UPS parameters tab
         ups_params = ttk.Frame(self.params_notebook)
         self.params_notebook.add(ups_params, text="UPS")
         
@@ -1628,7 +1628,7 @@ class SnmpBrowserGUI:
         self.trap_temp_var = tk.StringVar(value="25")
         ttk.Entry(ups_params, textvariable=self.trap_temp_var, width=10).grid(row=3, column=1, padx=5, pady=5, sticky=tk.W)
         
-        # Tab custom OID
+        # Custom OID tab
         custom_params = ttk.Frame(self.params_notebook)
         self.params_notebook.add(custom_params, text="Custom")
         
@@ -1641,11 +1641,11 @@ class SnmpBrowserGUI:
         self.trap_varbinds_text.grid(row=1, column=1, padx=5, pady=5)
         self.trap_varbinds_text.insert(tk.END, "1.3.6.1.4.1.99999.1.2=Test Value\n1.3.6.1.4.1.99999.1.3=123")
         
-        # Pulsanti invio
+        # Send buttons
         send_frame = ttk.Frame(sender_frame)
         send_frame.pack(fill=tk.X, padx=5, pady=10)
         
-        ttk.Button(send_frame, text="Invia Trap", command=self.send_trap,
+        ttk.Button(send_frame, text="Send Trap", command=self.send_trap,
                 style='Accent.TButton').pack(side=tk.LEFT, padx=5)
         
         ttk.Button(send_frame, text="Test Loop (5x)", command=self.send_trap_loop).pack(side=tk.LEFT, padx=5)
@@ -1657,34 +1657,34 @@ class SnmpBrowserGUI:
         self.trap_send_status.pack(side=tk.LEFT, padx=20)
 
     def create_performance_tab(self):
-        """Tab per performance metrics"""
+        """Tab for performance metrics"""
         perf_frame = ttk.Frame(self.notebook)
         self.notebook.add(perf_frame, text="Performance")
         
-        # Controlli
-        control_frame = ttk.LabelFrame(perf_frame, text="Controlli Performance")
+        # Controls
+        control_frame = ttk.LabelFrame(perf_frame, text="Performance Controls")
         control_frame.pack(fill=tk.X, padx=5, pady=5)
         
         controls = ttk.Frame(control_frame)
         controls.pack(padx=10, pady=10)
         
-        ttk.Button(controls, text="Aggiorna", command=self.update_performance_display).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls, text="Refresh", command=self.update_performance_display).pack(side=tk.LEFT, padx=5)
         ttk.Button(controls, text="Reset", command=self.reset_performance_metrics).pack(side=tk.LEFT, padx=5)
-        ttk.Button(controls, text="Esporta", command=self.export_performance_data).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls, text="Export", command=self.export_performance_data).pack(side=tk.LEFT, padx=5)
         
-        # Frame metriche
-        metrics_frame = ttk.LabelFrame(perf_frame, text="Metriche Correnti")
+        # Metrics frame
+        metrics_frame = ttk.LabelFrame(perf_frame, text="Current Metrics")
         metrics_frame.pack(fill=tk.X, padx=5, pady=5)
         
         self.metrics_text = tk.Text(metrics_frame, height=8, width=80)
         self.metrics_text.pack(padx=10, pady=10)
         
-        # Frame grafico (se matplotlib disponibile)
+        # Graph frame (if matplotlib available)
         if HAS_MATPLOTLIB:
-            graph_frame = ttk.LabelFrame(perf_frame, text="Grafici Performance")
+            graph_frame = ttk.LabelFrame(perf_frame, text="Performance Graphs")
             graph_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
             
-            # Crea figura matplotlib
+            # Create matplotlib figure
             self.perf_figure = Figure(figsize=(12, 6), dpi=80)
             self.perf_canvas = FigureCanvasTkAgg(self.perf_figure, master=graph_frame)
             self.perf_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -1693,24 +1693,24 @@ class SnmpBrowserGUI:
             self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
 
     def toggle_trap_receiver(self):
-        """Attiva/disattiva trap receiver"""
+        """Enable/disable trap receiver"""
         if self.trap_receiver and self.trap_receiver.running:
-            # Ferma receiver
+            # Stop receiver
             self.trap_receiver.stop()
             self.trap_receiver = None
-            self.trap_status_label.config(text="Status: Inattivo")
-            self.trap_toggle_btn.config(text="Avvia Receiver")
-            self.logger.info("Trap receiver fermato")
+            self.trap_status_label.config(text="Status: Inactive")
+            self.trap_toggle_btn.config(text="Start Receiver")
+            self.logger.info("Trap receiver stopped")
         else:
-            # Avvia receiver
+            # Start receiver
             try:
                 port = int(self.trap_port_var.get())
                 
-                # Check permessi porta
+                # Check port permissions
                 if port < 1024 and not self.check_admin_privileges():
-                    messagebox.showwarning("Permessi",
-                                         "Porta < 1024 richiede privilegi amministratore.\n"
-                                         "Usa una porta >= 1024 o avvia come admin.")
+                    messagebox.showwarning("Permissions",
+                                         "Port < 1024 requires administrator privileges.\n"
+                                         "Use a port >= 1024 or run as admin.")
                     return
                     
                 self.trap_receiver = TrapReceiver(
@@ -1720,19 +1720,19 @@ class SnmpBrowserGUI:
                 )
                 self.trap_receiver.start()
                 
-                self.trap_status_label.config(text=f"Status: Attivo (porta {port})")
-                self.trap_toggle_btn.config(text="Ferma Receiver")
-                self.logger.info(f"Trap receiver avviato su porta {port}")
+                self.trap_status_label.config(text=f"Status: Active (port {port})")
+                self.trap_toggle_btn.config(text="Stop Receiver")
+                self.logger.info(f"Trap receiver started on port {port}")
                 
-                # Avvia update periodico
+                # Start periodic update
                 self.update_trap_display()
                 
             except Exception as e:
-                messagebox.showerror("Errore", f"Impossibile avviare trap receiver:\n{str(e)}")
-                self.logger.error(f"Errore avvio trap receiver: {e}")
+                messagebox.showerror("Error", f"Unable to start trap receiver:\n{str(e)}")
+                self.logger.error(f"Error starting trap receiver: {e}")
 
     def check_admin_privileges(self):
-        """Verifica privilegi amministratore"""
+        """Check administrator privileges"""
         try:
             if sys.platform.startswith('win'):
                 import ctypes
@@ -1743,20 +1743,20 @@ class SnmpBrowserGUI:
             return False
 
     def on_trap_received(self, trap_info):
-        """Callback quando trap ricevuto"""
+        """Callback when trap is received"""
         self.received_traps.append(trap_info)
-        # Aggiorna contatore
+        # Update counter
         self.root.after(0, lambda: self.trap_stats_label.config(
-            text=f"Trap ricevuti: {len(self.received_traps)}"))
+            text=f"Traps received: {len(self.received_traps)}"))
 
     def update_trap_display(self):
-        """Aggiorna display trap"""
+        """Update trap display"""
         if self.trap_receiver and self.trap_receiver.running:
-            # Ottieni nuovi trap
+            # Get new traps
             new_traps = self.trap_receiver.get_traps()
             
             for trap in new_traps:
-                # Aggiungi al tree
+                # Add to tree
                 self.trap_tree.insert("", 0, values=(
                     trap['timestamp'],
                     trap['source'],
@@ -1765,23 +1765,23 @@ class SnmpBrowserGUI:
                     trap['raw_data'][:50] + "..." if len(trap['raw_data']) > 50 else trap['raw_data']
                 ))
                 
-            # Limita numero di trap visualizzati
+            # Limit number of displayed traps
             children = self.trap_tree.get_children()
             if len(children) > 1000:
                 for item in children[1000:]:
                     self.trap_tree.delete(item)
                     
-            # Richiama dopo 1 secondo
+            # Call again after 1 second
             self.root.after(1000, self.update_trap_display)
 
     def on_trap_double_click(self, event):
-        """Doppio click su trap per dettagli MIGLIORATO"""
+        """Double click on trap for IMPROVED details"""
         selection = self.trap_tree.selection()
         if selection:
             item = selection[0]
             values = self.trap_tree.item(item)['values']
             
-            # Trova il trap nei dati ricevuti
+            # Find trap in received data
             trap_data = None
             for trap in self.received_traps:
                 if trap['timestamp'] == values[0] and trap['source'] == values[1]:
@@ -1789,7 +1789,7 @@ class SnmpBrowserGUI:
                     break
             
             if not trap_data:
-                # Fallback ai valori del tree
+                # Fallback to tree values
                 trap_data = {
                     'timestamp': values[0],
                     'source': values[1],
@@ -1798,19 +1798,19 @@ class SnmpBrowserGUI:
                     'raw_data': values[4] if len(values) > 4 else ""
                 }
             
-            # Mostra dettagli trap
+            # Show trap details
             detail_window = tk.Toplevel(self.root)
-            detail_window.title("Dettagli Trap - Decodificato")
+            detail_window.title("Trap Details - Decoded")
             detail_window.geometry("800x600")
             detail_window.transient(self.root)
             
-            # Notebook per diverse viste
+            # Notebook for different views
             notebook = ttk.Notebook(detail_window)
             notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
             
-            # Tab Info Base
+            # Basic Info Tab
             info_frame = ttk.Frame(notebook)
-            notebook.add(info_frame, text="Info Base")
+            notebook.add(info_frame, text="Basic Info")
             
             info_text = ttk.Frame(info_frame)
             info_text.pack(fill=tk.X, padx=10, pady=10)
@@ -1826,12 +1826,12 @@ class SnmpBrowserGUI:
                 ttk.Label(info_text, text=f"Trap Type: {trap_data['trap_type']}",
                         font=('TkDefaultFont', 10, 'bold')).pack(anchor=tk.W, pady=5)
             
-            # Tab Varbinds Decodificati
+            # Decoded Varbinds Tab
             if trap_data.get('decoded') and trap_data['decoded'].get('varbinds'):
                 varbind_frame = ttk.Frame(notebook)
                 notebook.add(varbind_frame, text="Varbinds")
                 
-                # TreeView per varbinds
+                # TreeView for varbinds
                 columns = ("OID", "Name", "Type", "Value")
                 vb_tree = ttk.Treeview(varbind_frame, columns=columns, show="headings", height=10)
                 
@@ -1839,7 +1839,7 @@ class SnmpBrowserGUI:
                     vb_tree.heading(col, text=col)
                     vb_tree.column(col, width=150)
                 
-                # Popola varbinds
+                # Populate varbinds
                 for vb in trap_data['decoded']['varbinds']:
                     vb_tree.insert("", tk.END, values=(
                         vb['oid'],
@@ -1854,39 +1854,39 @@ class SnmpBrowserGUI:
                 vb_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
                 vb_scroll.pack(side=tk.RIGHT, fill=tk.Y)
             
-            # Tab Raw Hex
+            # Raw Hex Tab
             hex_frame = ttk.Frame(notebook)
             notebook.add(hex_frame, text="Raw Hex")
             
             hex_text = tk.Text(hex_frame, wrap=tk.WORD, font=('Courier', 10))
             hex_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
             
-            # Formatta hex in righe
+            # Format hex in rows
             raw_hex = trap_data.get('raw_data', '')
             formatted_hex = ""
             for i in range(0, len(raw_hex), 32):
                 line = raw_hex[i:i+32]
-                # Aggiungi spazi ogni 2 caratteri
+                # Add spaces every 2 characters
                 spaced = ' '.join(line[j:j+2] for j in range(0, len(line), 2))
                 formatted_hex += f"{i//2:04x}: {spaced}\n"
             
             hex_text.insert(tk.END, formatted_hex)
             hex_text.config(state=tk.DISABLED)
             
-            # Tab Decodifica Completa
+            # Full Decode Tab
             decode_frame = ttk.Frame(notebook)
-            notebook.add(decode_frame, text="Decodifica")
+            notebook.add(decode_frame, text="Decoding")
             
             decode_text = tk.Text(decode_frame, wrap=tk.WORD, font=('Courier', 10))
             decode_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
             
-            # Decodifica on-demand
+            # On-demand decoding
             def decode_full():
                 from snmpy import decode_snmp_hex
                 import io
                 import sys
                 
-                # Cattura output
+                # Capture output
                 old_stdout = sys.stdout
                 sys.stdout = buffer = io.StringIO()
                 
@@ -1900,17 +1900,17 @@ class SnmpBrowserGUI:
                 decode_text.insert(tk.END, output)
                 decode_text.config(state=tk.DISABLED)
             
-            ttk.Button(decode_frame, text="Decodifica Dettagliata", 
+            ttk.Button(decode_frame, text="Detailed Decode", 
                     command=decode_full).pack(pady=5)
             
-            # Pulsanti
+            # Buttons
             btn_frame = ttk.Frame(detail_window)
             btn_frame.pack(pady=10)
             
             def copy_hex():
                 self.root.clipboard_clear()
                 self.root.clipboard_append(raw_hex)
-                messagebox.showinfo("Copiato", "Hex copiato negli appunti!")
+                messagebox.showinfo("Copied", "Hex copied to clipboard!")
             
             def save_trap():
                 filename = filedialog.asksaveasfilename(
@@ -1921,24 +1921,24 @@ class SnmpBrowserGUI:
                 if filename:
                     with open(filename, 'w') as f:
                         json.dump(trap_data, f, indent=2, default=str)
-                    messagebox.showinfo("Salvato", f"Trap salvato in {filename}")
+                    messagebox.showinfo("Saved", f"Trap saved to {filename}")
             
-            ttk.Button(btn_frame, text="Copia Hex", command=copy_hex).pack(side=tk.LEFT, padx=5)
-            ttk.Button(btn_frame, text="Salva", command=save_trap).pack(side=tk.LEFT, padx=5)
-            ttk.Button(btn_frame, text="Chiudi", command=detail_window.destroy).pack(side=tk.LEFT, padx=5)
+            ttk.Button(btn_frame, text="Copy Hex", command=copy_hex).pack(side=tk.LEFT, padx=5)
+            ttk.Button(btn_frame, text="Save", command=save_trap).pack(side=tk.LEFT, padx=5)
+            ttk.Button(btn_frame, text="Close", command=detail_window.destroy).pack(side=tk.LEFT, padx=5)
 
     def clear_traps(self):
-        """Pulisce trap ricevuti"""
-        if messagebox.askyesno("Conferma", "Pulire tutti i trap ricevuti?"):
+        """Clear received traps"""
+        if messagebox.askyesno("Confirm", "Clear all received traps?"):
             self.received_traps.clear()
             for item in self.trap_tree.get_children():
                 self.trap_tree.delete(item)
-            self.trap_stats_label.config(text="Trap ricevuti: 0")
+            self.trap_stats_label.config(text="Traps received: 0")
 
     def export_traps(self):
-        """Esporta trap ricevuti"""
+        """Export received traps"""
         if not self.received_traps:
-            messagebox.showwarning("Avviso", "Nessun trap da esportare")
+            messagebox.showwarning("Warning", "No traps to export")
             return
             
         filename = filedialog.asksaveasfilename(
@@ -1965,70 +1965,70 @@ class SnmpBrowserGUI:
                                 trap['raw_data']
                             ])
                             
-                messagebox.showinfo("Export", f"Trap esportati: {filename}")
+                messagebox.showinfo("Export", f"Traps exported: {filename}")
             except Exception as e:
-                messagebox.showerror("Errore", f"Errore export: {str(e)}")
+                messagebox.showerror("Error", f"Export error: {str(e)}")
 
     def on_tab_changed(self, event):
-        """Gestisce cambio tab"""
+        """Handle tab change"""
         selected = self.notebook.select()
         tab_text = self.notebook.tab(selected, "text")
         
-        # Attiva/disattiva aggiornamento performance
+        # Enable/disable performance update
         self.performance_tab_active = (tab_text == "Performance")
         
         if self.performance_tab_active:
             self.update_performance_display()
 
     def update_performance_display(self):
-        """Aggiorna display performance"""
+        """Update performance display"""
         try:
-            # Ottieni metriche
+            # Get metrics
             summary = self.performance_monitor.get_summary()
             
-            # Aggiorna testo
+            # Update text
             self.metrics_text.delete(1.0, tk.END)
             
             text = f"""
-Query Totali: {summary['total_queries']}
+Total Queries: {summary['total_queries']}
 Success Rate: {summary['success_rate']}
-Query/Secondo: {summary['current_qps']}
+Queries/Second: {summary['current_qps']}
 
-Tempo Risposta Medio: {summary['avg_response_time']}
-Tempo Risposta Min: {summary['min_response_time']}
-Tempo Risposta Max: {summary['max_response_time']}
+Average Response Time: {summary['avg_response_time']}
+Min Response Time: {summary['min_response_time']}
+Max Response Time: {summary['max_response_time']}
 
-Memoria Usata: {summary['memory_mb']} MB
+Memory Used: {summary['memory_mb']} MB
 CPU Usage: {summary['cpu_percent']}%
 """
             self.metrics_text.insert(tk.END, text)
             
-            # Aggiorna grafici se disponibili
+            # Update graphs if available
             if HAS_MATPLOTLIB and hasattr(self, 'perf_figure'):
                 self.update_performance_graphs()
                 
         except Exception as e:
-            self.logger.error(f"Errore aggiornamento performance: {e}")
+            self.logger.error(f"Error updating performance: {e}")
 
     def update_performance_graphs(self):
-        """Aggiorna grafici performance"""
+        """Update performance graphs"""
         try:
             self.perf_figure.clear()
             
-            # Crea subplot
+            # Create subplots
             ax1 = self.perf_figure.add_subplot(2, 2, 1)
             ax2 = self.perf_figure.add_subplot(2, 2, 2)
             ax3 = self.perf_figure.add_subplot(2, 2, 3)
             ax4 = self.perf_figure.add_subplot(2, 2, 4)
             
-            # Grafico response time
+            # Response time graph
             if self.performance_monitor.metrics['response_times']:
                 ax1.plot(list(self.performance_monitor.metrics['response_times']))
-                ax1.set_title('Tempo Risposta (s)')
+                ax1.set_title('Response Time (s)')
                 ax1.set_xlabel('Query')
                 ax1.grid(True)
                 
-            # Grafico success rate
+            # Success rate graph
             if self.performance_monitor.metrics['success_rate']:
                 ax2.plot(list(self.performance_monitor.metrics['success_rate']))
                 ax2.set_title('Success Rate (%)')
@@ -2036,34 +2036,34 @@ CPU Usage: {summary['cpu_percent']}%
                 ax2.set_ylim([0, 105])
                 ax2.grid(True)
                 
-            # Grafico memoria
+            # Memory graph
             if self.performance_monitor.metrics['memory_usage']:
                 ax3.plot(list(self.performance_monitor.metrics['memory_usage']))
-                ax3.set_title('Memoria (MB)')
-                ax3.set_xlabel('Tempo')
+                ax3.set_title('Memory (MB)')
+                ax3.set_xlabel('Time')
                 ax3.grid(True)
                 
-            # Grafico QPS
+            # QPS graph
             if self.performance_monitor.metrics['queries_per_second']:
                 ax4.plot(list(self.performance_monitor.metrics['queries_per_second']))
-                ax4.set_title('Query/Secondo')
-                ax4.set_xlabel('Tempo')
+                ax4.set_title('Queries/Second')
+                ax4.set_xlabel('Time')
                 ax4.grid(True)
                 
             self.perf_figure.tight_layout()
             self.perf_canvas.draw()
             
         except Exception as e:
-            self.logger.error(f"Errore aggiornamento grafici: {e}")
+            self.logger.error(f"Error updating graphs: {e}")
 
     def reset_performance_metrics(self):
-        """Reset metriche performance"""
-        if messagebox.askyesno("Conferma", "Resettare tutte le metriche?"):
+        """Reset performance metrics"""
+        if messagebox.askyesno("Confirm", "Reset all metrics?"):
             self.performance_monitor = PerformanceMonitor()
             self.update_performance_display()
 
     def export_performance_data(self):
-        """Esporta dati performance"""
+        """Export performance data"""
         filename = filedialog.asksaveasfilename(
             defaultextension=".json",
             filetypes=[("JSON Files", "*.json"), ("CSV Files", "*.csv")],
@@ -2095,36 +2095,36 @@ CPU Usage: {summary['cpu_percent']}%
                         for key, value in data['summary'].items():
                             writer.writerow([key, value])
                             
-                messagebox.showinfo("Export", f"Performance data esportato: {filename}")
+                messagebox.showinfo("Export", f"Performance data exported: {filename}")
             except Exception as e:
-                messagebox.showerror("Errore", f"Errore export: {str(e)}")
+                messagebox.showerror("Error", f"Export error: {str(e)}")
 
     def show_batch_operations(self):
-        """Mostra dialog operazioni batch"""
+        """Show batch operations dialog"""
         batch_window = tk.Toplevel(self.root)
-        batch_window.title("Operazioni Batch")
+        batch_window.title("Batch Operations")
         batch_window.geometry("700x500")
         batch_window.transient(self.root)
         
-        # Frame hosts
-        hosts_frame = ttk.LabelFrame(batch_window, text="Lista Host (uno per riga)")
+        # Hosts frame
+        hosts_frame = ttk.LabelFrame(batch_window, text="Host List (one per line)")
         hosts_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         hosts_text = tk.Text(hosts_frame, height=10)
         hosts_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Esempio
+        # Example
         hosts_text.insert(tk.END, "192.168.1.1\n192.168.1.2\n192.168.1.3")
         
-        # Frame OID
-        oid_frame = ttk.LabelFrame(batch_window, text="OID da Interrogare")
+        # OID frame
+        oid_frame = ttk.LabelFrame(batch_window, text="OID to Query")
         oid_frame.pack(fill=tk.X, padx=10, pady=5)
         
         oid_var = tk.StringVar(value="1.3.6.1.2.1.1.1.0")
         ttk.Entry(oid_frame, textvariable=oid_var, width=50).pack(padx=5, pady=5)
         
-        # Frame opzioni
-        options_frame = ttk.LabelFrame(batch_window, text="Opzioni")
+        # Options frame
+        options_frame = ttk.LabelFrame(batch_window, text="Options")
         options_frame.pack(fill=tk.X, padx=10, pady=5)
         
         opts = ttk.Frame(options_frame)
@@ -2135,34 +2135,34 @@ CPU Usage: {summary['cpu_percent']}%
         ttk.Spinbox(opts, from_=1, to=20, textvariable=workers_var, width=10).grid(row=0, column=1, padx=5)
         
         walk_var = tk.BooleanVar()
-        ttk.Checkbutton(opts, text="WALK (usa * alla fine dell'OID)",
+        ttk.Checkbutton(opts, text="WALK (use * at the end of OID)",
                        variable=walk_var).grid(row=1, column=0, columnspan=2, pady=5)
         
         # Progress
         self.batch_progress = ttk.Progressbar(batch_window, mode='determinate')
         self.batch_progress.pack(fill=tk.X, padx=10, pady=5)
         
-        self.batch_status = tk.StringVar(value="Pronto")
+        self.batch_status = tk.StringVar(value="Ready")
         ttk.Label(batch_window, textvariable=self.batch_status).pack()
         
-        # Pulsanti
+        # Buttons
         btn_frame = ttk.Frame(batch_window)
         btn_frame.pack(pady=10)
         
         def run_batch():
-            # Ottieni hosts
+            # Get hosts
             hosts = [h.strip() for h in hosts_text.get(1.0, tk.END).split('\n') if h.strip()]
             
             if not hosts:
-                messagebox.showwarning("Avviso", "Inserisci almeno un host")
+                messagebox.showwarning("Warning", "Enter at least one host")
                 return
                 
-            # Prepara OID
+            # Prepare OID
             oid = oid_var.get()
             if walk_var.get() and not oid.endswith('*'):
                 oid += '*'
                 
-            # Prepara config SNMP
+            # Prepare SNMP config
             snmp_config = {
                 'version': self.version_var.get(),
                 'community': self.community_var.get(),
@@ -2183,27 +2183,27 @@ CPU Usage: {summary['cpu_percent']}%
             # Progress callback
             def progress_callback(completed, total):
                 self.batch_progress['value'] = (completed / total) * 100
-                self.batch_status.set(f"Completati {completed}/{total} hosts")
+                self.batch_status.set(f"Completed {completed}/{total} hosts")
                 batch_window.update()
                 
-            # Esegui batch
-            self.batch_status.set("Esecuzione batch...")
+            # Execute batch
+            self.batch_status.set("Running batch...")
             self.batch_operations.max_workers = int(workers_var.get())
             
             results = self.batch_operations.scan_multiple_hosts(
                 hosts, oid, snmp_config, progress_callback)
                 
-            # Mostra risultati
+            # Show results
             self.show_batch_results(results)
             batch_window.destroy()
             
-        ttk.Button(btn_frame, text="Esegui", command=run_batch).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Annulla", command=batch_window.destroy).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Run", command=run_batch).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=batch_window.destroy).pack(side=tk.LEFT, padx=5)
 
     def show_batch_results(self, results):
-        """Mostra risultati operazioni batch"""
+        """Show batch results"""
         results_window = tk.Toplevel(self.root)
-        results_window.title("Risultati Batch")
+        results_window.title("Batch Results")
         results_window.geometry("800x600")
         results_window.transient(self.root)
         
@@ -2218,11 +2218,11 @@ CPU Usage: {summary['cpu_percent']}%
             tree.heading(col, text=col)
             tree.column(col, width=150)
             
-        # Popola risultati
+        # Populate results
         for host, data in results.items():
             if data.get('success'):
                 if 'results' in data:
-                    # Multi risultati (walk)
+                    # Multi results (walk)
                     for oid, value in data['results'].items():
                         tree.insert("", tk.END, values=(
                             host, "OK", f"{oid}: {value}",
@@ -2244,7 +2244,7 @@ CPU Usage: {summary['cpu_percent']}%
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Pulsanti
+        # Buttons
         btn_frame = ttk.Frame(results_window)
         btn_frame.pack(pady=10)
         
@@ -2258,15 +2258,15 @@ CPU Usage: {summary['cpu_percent']}%
             if filename:
                 self.batch_operations.export_results(
                     filename, 'csv' if filename.endswith('.csv') else 'json')
-                messagebox.showinfo("Export", f"Risultati esportati: {filename}")
+                messagebox.showinfo("Export", f"Results exported: {filename}")
                 
-        ttk.Button(btn_frame, text="Esporta", command=export_batch).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Export", command=export_batch).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="OK", command=results_window.destroy).pack(side=tk.LEFT, padx=5)
 
     def load_mib_file(self):
-        """Carica file MIB"""
+        """Load MIB file"""
         filename = filedialog.askopenfilename(
-            title="Carica File MIB",
+            title="Load MIB File",
             filetypes=[
                 ("MIB Files", "*.mib"),
                 ("Text Files", "*.txt"),
@@ -2276,25 +2276,24 @@ CPU Usage: {summary['cpu_percent']}%
         
         if filename:
             if self.mib_parser.load_mib_file(filename):
-                # Aggiorna dizionario OID
+                # Update OID dictionary
                 self.oid_names.update(self.mib_parser.mib_definitions)
-                messagebox.showinfo("MIB Caricato",
-                                   f"File MIB caricato con successo!\n"
-                                   f"Definizioni totali: {len(self.mib_parser.mib_definitions)}")
+                messagebox.showinfo("MIB Loaded",
+                                   f"MIB file loaded successfully!\n"
+                                   f"Total definitions: {len(self.mib_parser.mib_definitions)}")
             else:
-                messagebox.showerror("Errore", "Errore caricamento file MIB")
+                messagebox.showerror("Error", "Error loading MIB file")
 
     def search_mib_definitions(self):
-        """Cerca nelle definizioni MIB"""
-        search_term = simpledialog.askstring("Cerca MIB", "Inserisci termine di ricerca:")
-        
+        """Search MIB definitions"""
+        search_term = simpledialog.askstring("Search MIB", "Enter search term:")
         if search_term:
             results = self.mib_parser.search_name(search_term)
             
             if results:
-                # Mostra risultati
+                # Show results
                 result_window = tk.Toplevel(self.root)
-                result_window.title(f"Risultati ricerca: {search_term}")
+                result_window.title(f"Search results: {search_term}")
                 result_window.geometry("600x400")
                 result_window.transient(self.root)
                 
@@ -2322,27 +2321,27 @@ CPU Usage: {summary['cpu_percent']}%
                 ttk.Button(result_window, text="OK",
                           command=result_window.destroy).pack(pady=10)
             else:
-                messagebox.showinfo("Ricerca", "Nessun risultato trovato")
+                messagebox.showinfo("Search", "No results found")
 
     def show_profile_manager(self):
-        """Mostra gestore profili"""
+        """Show profile manager"""
         profile_window = tk.Toplevel(self.root)
-        profile_window.title("Gestione Profili")
+        profile_window.title("Profile Manager")
         profile_window.geometry("500x400")
         profile_window.transient(self.root)
         
-        # Lista profili
-        list_frame = ttk.LabelFrame(profile_window, text="Profili Salvati")
+        # Profile list
+        list_frame = ttk.LabelFrame(profile_window, text="Saved Profiles")
         list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         listbox = tk.Listbox(list_frame)
         listbox.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Popola lista
+        # Populate list
         for profile_name in self.profile_manager.list_profiles():
             listbox.insert(tk.END, profile_name)
             
-        # Pulsanti
+        # Buttons
         btn_frame = ttk.Frame(profile_window)
         btn_frame.pack(pady=10)
         
@@ -2357,7 +2356,7 @@ CPU Usage: {summary['cpu_percent']}%
             selection = listbox.curselection()
             if selection:
                 profile_name = listbox.get(selection[0])
-                if messagebox.askyesno("Conferma", f"Eliminare profilo '{profile_name}'?"):
+                if messagebox.askyesno("Confirm", f"Delete profile '{profile_name}'?"):
                     self.profile_manager.delete_profile(profile_name)
                     listbox.delete(selection[0])
                     self.update_profile_list()
@@ -2366,7 +2365,7 @@ CPU Usage: {summary['cpu_percent']}%
             selection = listbox.curselection()
             if selection:
                 old_name = listbox.get(selection[0])
-                new_name = simpledialog.askstring("Rinomina", "Nuovo nome:",
+                new_name = simpledialog.askstring("Rename", "New name:",
                                                  initialvalue=old_name)
                 if new_name and new_name != old_name:
                     config = self.profile_manager.get_profile(old_name)
@@ -2376,14 +2375,14 @@ CPU Usage: {summary['cpu_percent']}%
                     listbox.insert(selection[0], new_name)
                     self.update_profile_list()
                     
-        ttk.Button(btn_frame, text="Carica", command=load_profile).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Elimina", command=delete_profile).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Rinomina", command=rename_profile).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Chiudi", command=profile_window.destroy).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Load", command=load_profile).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Delete", command=delete_profile).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Rename", command=rename_profile).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Close", command=profile_window.destroy).pack(side=tk.LEFT, padx=5)
 
     def save_current_profile(self):
-        """Salva configurazione corrente come profilo"""
-        profile_name = simpledialog.askstring("Salva Profilo", "Nome profilo:")
+        """Save current configuration as profile"""
+        profile_name = simpledialog.askstring("Save Profile", "Profile name:")
         
         if profile_name:
             config = {
@@ -2410,10 +2409,10 @@ CPU Usage: {summary['cpu_percent']}%
             self.update_profile_list()
             self.current_profile_var.set(profile_name)
             
-            messagebox.showinfo("Profilo Salvato", f"Profilo '{profile_name}' salvato con successo")
+            messagebox.showinfo("Profile Saved", f"Profile '{profile_name}' saved successfully")
 
     def load_profile(self, profile_name):
-        """Carica profilo"""
+        """Load profile"""
         config = self.profile_manager.get_profile(profile_name)
         
         if config:
@@ -2434,57 +2433,57 @@ CPU Usage: {summary['cpu_percent']}%
                 self.community_var.set(config.get('community', 'public'))
                 
             self.current_profile_var.set(profile_name)
-            self.logger.info(f"Profilo '{profile_name}' caricato")
+            self.logger.info(f"Profile '{profile_name}' loaded")
 
     def on_profile_selected(self, event):
-        """Gestisce selezione profilo dal combo"""
+        """Handle profile selection from combo"""
         profile_name = self.current_profile_var.get()
         if profile_name and profile_name != "Default":
             self.load_profile(profile_name)
 
     def update_profile_list(self):
-        """Aggiorna lista profili nel combo"""
+        """Update profile list in combo"""
         profiles = ["Default"] + self.profile_manager.list_profiles()
         self.profile_combo['values'] = profiles
 
     def show_performance_window(self):
-        """Mostra finestra performance dedicata"""
+        """Show dedicated performance window"""
         perf_window = tk.Toplevel(self.root)
         perf_window.title("Performance Monitor")
         perf_window.geometry("900x600")
         perf_window.transient(self.root)
         
-        # Seleziona tab performance
+        # Select performance tab
         for i in range(self.notebook.index("end")):
             if self.notebook.tab(i, "text") == "Performance":
                 self.notebook.select(i)
                 break
     
     def create_browser_tab(self):
-        """Tab Browser principale"""
+        """Main Browser tab"""
         browser_frame = ttk.Frame(self.notebook)
-        self.notebook.add(browser_frame, text="Browser SNMP")
+        self.notebook.add(browser_frame, text="SNMP Browser")
 
-        # Filtri
-        filter_frame = ttk.LabelFrame(browser_frame, text="Filtri")
+        # Filters
+        filter_frame = ttk.LabelFrame(browser_frame, text="Filters")
         filter_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(filter_frame, text="Cerca:").pack(side=tk.LEFT, padx=5)
+        ttk.Label(filter_frame, text="Search:").pack(side=tk.LEFT, padx=5)
         self.filter_var.trace('w', self.apply_filter)
         filter_entry = ttk.Entry(filter_frame, textvariable=self.filter_var, width=30)
         filter_entry.pack(side=tk.LEFT, padx=5)
 
-        ttk.Button(filter_frame, text="Pulisci", command=self.clear_filter).pack(side=tk.LEFT, padx=5)
+        ttk.Button(filter_frame, text="Clear", command=self.clear_filter).pack(side=tk.LEFT, padx=5)
 
-        ttk.Checkbutton(filter_frame, text="Solo Errori",
+        ttk.Checkbutton(filter_frame, text="Errors Only",
                         variable=self.show_errors_var,
                         command=self.apply_filter).pack(side=tk.LEFT, padx=(20, 5))
 
-        # Risultati
+        # Results
         results_frame = ttk.Frame(browser_frame)
         results_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        columns = ("OID", "Nome", "Tipo", "Valore", "Stato", "Timestamp")
+        columns = ("OID", "Name", "Type", "Value", "Status", "Timestamp")
         self.results_tree = ttk.Treeview(results_frame, columns=columns, show="headings", height=15)
 
         for col in columns:
@@ -2497,7 +2496,7 @@ CPU Usage: {summary['cpu_percent']}%
         self.results_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         results_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Azioni
+        # Actions
         action_frame = ttk.Frame(browser_frame)
         action_frame.pack(fill=tk.X, padx=5, pady=5)
 
@@ -2507,22 +2506,22 @@ CPU Usage: {summary['cpu_percent']}%
         ttk.Button(action_frame, text="WALK", command=self.walk_from_selected).pack(side=tk.LEFT, padx=2)
         ttk.Button(action_frame, text="Export", command=self.export_results).pack(side=tk.LEFT, padx=2)
 
-        # Bind eventi
+        # Bind events
         self.results_tree.bind("<Double-1>", self.on_result_double_click)
         self.results_tree.bind("<Button-3>", self.show_context_menu)
 
     def create_dashboard_tab(self):
-        """Tab Dashboard"""
+        """Dashboard tab"""
         dashboard_frame = ttk.Frame(self.notebook)
         self.notebook.add(dashboard_frame, text="Dashboard")
 
-        # Controlli
-        control_frame = ttk.LabelFrame(dashboard_frame, text="Controlli Dashboard")
+        # Controls
+        control_frame = ttk.LabelFrame(dashboard_frame, text="Dashboard Controls")
         control_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Button(control_frame, text="Aggiorna", command=self.refresh_dashboard).pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(control_frame, text="Rimuovi", command=self.remove_from_dashboard).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="Pulisci", command=self.clear_dashboard).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Refresh", command=self.refresh_dashboard).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(control_frame, text="Remove", command=self.remove_from_dashboard).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Clear", command=self.clear_dashboard).pack(side=tk.LEFT, padx=5)
 
         ttk.Checkbutton(control_frame, text="Auto-Refresh (30s)",
                         variable=self.auto_refresh_var,
@@ -2532,7 +2531,7 @@ CPU Usage: {summary['cpu_percent']}%
         dash_frame = ttk.Frame(dashboard_frame)
         dash_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        dash_columns = ("Host", "OID", "Nome", "Valore", "Timestamp", "Stato")
+        dash_columns = ("Host", "OID", "Name", "Value", "Timestamp", "Status")
         self.dashboard_tree = ttk.Treeview(dash_frame, columns=dash_columns, show="headings", height=15)
 
         for col in dash_columns:
@@ -2546,28 +2545,28 @@ CPU Usage: {summary['cpu_percent']}%
         dash_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
     def create_mib_tree_tab(self):
-        """Tab Albero MIB con colonna valore"""
+        """MIB tree tab with value column"""
         mib_frame = ttk.Frame(self.notebook)
-        self.notebook.add(mib_frame, text="Albero MIB")
+        self.notebook.add(mib_frame, text="MIB Tree")
 
-        # Controlli
-        control_frame = ttk.LabelFrame(mib_frame, text="Controlli Albero MIB")
+        # Controls
+        control_frame = ttk.LabelFrame(mib_frame, text="MIB Tree Controls")
         control_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Button(control_frame, text="Costruisci", command=self.build_mib_tree).pack(side=tk.LEFT, padx=5, pady=5)
-        ttk.Button(control_frame, text="Espandi", command=self.expand_all_mib).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="Comprimi", command=self.collapse_all_mib).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Build", command=self.build_mib_tree).pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(control_frame, text="Expand", command=self.expand_all_mib).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Collapse", command=self.collapse_all_mib).pack(side=tk.LEFT, padx=5)
 
-        # TreeView con colonna valore aggiunta
+        # TreeView with added value column
         tree_frame = ttk.Frame(mib_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         self.mib_tree = ttk.Treeview(tree_frame, columns=("oid", "value", "type", "status"), height=20)
-        self.mib_tree.heading("#0", text="Nome MIB")
+        self.mib_tree.heading("#0", text="MIB Name")
         self.mib_tree.heading("oid", text="OID")
-        self.mib_tree.heading("value", text="Valore")
-        self.mib_tree.heading("type", text="Tipo")
-        self.mib_tree.heading("status", text="Stato")
+        self.mib_tree.heading("value", text="Value")
+        self.mib_tree.heading("type", text="Type")
+        self.mib_tree.heading("status", text="Status")
 
         self.mib_tree.column("#0", width=300)
         self.mib_tree.column("oid", width=200)
@@ -2584,17 +2583,17 @@ CPU Usage: {summary['cpu_percent']}%
         self.mib_tree.bind("<Double-1>", self.on_mib_double_click)
 
     def create_status_frame(self, parent):
-        """Frame di stato con info memoria"""
+        """Status frame with memory info"""
         status_frame = ttk.Frame(parent)
         status_frame.pack(fill=tk.X, pady=(5, 0))
 
         self.progress = ttk.Progressbar(status_frame, mode='indeterminate')
         self.progress.pack(side=tk.LEFT, padx=(0, 10))
 
-        self.status_var = tk.StringVar(value="Pronto")
+        self.status_var = tk.StringVar(value="Ready")
         ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT)
 
-        # Info memoria
+        # Memory info
         self.memory_var = tk.StringVar(value="")
         ttk.Label(status_frame, textvariable=self.memory_var).pack(side=tk.LEFT, padx=(20, 0))
 
@@ -2606,10 +2605,10 @@ CPU Usage: {summary['cpu_percent']}%
         self.update_time()
 
     def update_time(self):
-        """Aggiorna ora e memoria"""
+        """Update time and memory"""
         self.time_var.set(time.strftime("%H:%M:%S"))
 
-        # Aggiorna info memoria
+        # Update memory info
         process = psutil.Process()
         memory_mb = process.memory_info().rss / 1024 / 1024
         self.memory_var.set(f"{memory_mb:.1f}MB")
@@ -2617,90 +2616,90 @@ CPU Usage: {summary['cpu_percent']}%
         self.root.after(1000, self.update_time)
 
     def on_version_change(self, *args):
-        """Gestisce cambio versione SNMP"""
+        """Handle SNMP version change"""
         version = self.version_var.get()
 
         if version == "3":
             self.v1v2_frame.pack_forget()
             self.v3_frame.pack(fill=tk.X, padx=5, pady=5)
-            self.logger.info("Passaggio a SNMPv3")
+            self.logger.info("Switched to SNMPv3")
         else:
             if not self.v1v2_frame.winfo_viewable():
                 self.v1v2_frame.pack(side=tk.LEFT, padx=(10, 0))
             self.v3_frame.pack_forget()
-            self.logger.info(f"Passaggio a SNMPv{version}")
+            self.logger.info(f"Switched to SNMPv{version}")
 
     def toggle_password_visibility(self):
-        """Mostra/nasconde password v3"""
+        """Show/hide v3 passwords"""
         show = "" if self.v3_show_passwords.get() else "*"
         self.auth_pass_entry.config(show=show)
         self.priv_pass_entry.config(show=show)
 
     def validate_input(self) -> Tuple[bool, str]:
-        """Validazione completa input"""
+        """Complete input validation"""
         try:
             # Host
             host = self.host_var.get().strip()
             if not host:
-                return False, "Host non può essere vuoto!"
+                return False, "Host cannot be empty!"
 
-            # Porta
+            # Port
             port = int(self.port_var.get())
             if port < 1 or port > 65535:
-                return False, "Porta deve essere tra 1 e 65535!"
+                return False, "Port must be between 1 and 65535!"
 
             # Timeout
             timeout = float(self.timeout_var.get())
             if timeout < 0.1 or timeout > 60:
-                return False, "Timeout deve essere tra 0.1 e 60 secondi!"
+                return False, "Timeout must be between 0.1 and 60 seconds!"
 
             # Retries
             retries = int(self.retries_var.get())
             if retries < 0 or retries > 10:
-                return False, "Retries deve essere tra 0 e 10!"
+                return False, "Retries must be between 0 and 10!"
 
             # SNMPv3
             if self.version_var.get() == "3":
                 if not self.v3_user_var.get().strip():
-                    return False, "Username SNMPv3 richiesto!"
+                    return False, "SNMPv3 username required!"
 
                 if self.v3_auth_protocol_var.get() != "noAuth":
                     if len(self.v3_auth_password_var.get()) < 8:
-                        return False, "Password auth deve essere almeno 8 caratteri!"
+                        return False, "Auth password must be at least 8 characters!"
 
                 if self.v3_priv_protocol_var.get() != "noPriv":
                     if len(self.v3_priv_password_var.get()) < 8:
-                        return False, "Password priv deve essere almeno 8 caratteri!"
+                        return False, "Priv password must be at least 8 characters!"
             else:
                 if not self.community_var.get().strip():
-                    return False, "Community string richiesta!"
+                    return False, "Community string required!"
 
-            # Test risoluzione host
+            # Test host resolution
             try:
                 ipaddress.ip_address(host)
             except:
                 try:
                     resolved = socket.gethostbyname(host)
-                    self.logger.info(f"Host risolto: {host} -> {resolved}")
+                    self.logger.info(f"Host resolved: {host} -> {resolved}")
                 except:
-                    return False, f"Impossibile risolvere host: {host}"
+                    return False, f"Unable to resolve host: {host}"
 
-            # Limiti memoria
+            # Memory limits
             max_results = int(self.max_results_var.get())
             if max_results < 100 or max_results > 100000:
-                return False, "Max risultati deve essere tra 100 e 100000!"
+                return False, "Max results must be between 100 and 100000!"
 
             max_memory = int(self.max_memory_var.get())
             if max_memory < 50 or max_memory > 2000:
-                return False, "Max memoria deve essere tra 50 e 2000 MB!"
+                return False, "Max memory must be between 50 and 2000 MB!"
 
             return True, ""
 
         except ValueError as e:
-            return False, f"Errore validazione: {str(e)}"
+            return False, f"Validation error: {str(e)}"
 
     def create_snmpv3_client(self):
-        """Crea client SNMPv3 con gestione sicura"""
+        """Create SNMPv3 client with secure handling"""
         try:
             auth_map = {
                 "noAuth": SnmpV3AuthProtocol.NO_AUTH,
@@ -2736,31 +2735,31 @@ CPU Usage: {summary['cpu_percent']}%
                 retries=int(self.retries_var.get())
             )
 
-            self.logger.info(f"Client SNMPv3 creato per {self.host_var.get()}")
+            self.logger.info(f"SNMPv3 client created for {self.host_var.get()}")
             return client
 
         except Exception as e:
-            self.logger.error(f"Errore creazione client v3: {str(e)}")
+            self.logger.error(f"Error creating v3 client: {str(e)}")
             raise
 
     def test_connection(self):
-        """Test connessione non bloccante"""
-        # Valida input
+        """Non-blocking connection test"""
+        # Validate input
         valid, error = self.validate_input()
         if not valid:
-            messagebox.showerror("Errore", error)
+            messagebox.showerror("Error", error)
             return
 
         self.scan_btn.config(state=tk.DISABLED)
-        self.status_var.set("Test connessione...")
+        self.status_var.set("Testing connection...")
         self.progress.start()
-        self.logger.info(f"Test connessione a {self.host_var.get()}")
+        self.logger.info(f"Testing connection to {self.host_var.get()}")
 
         thread = threading.Thread(target=self._test_connection_worker, daemon=True)
         thread.start()
 
     def _test_connection_worker(self):
-        """Worker test connessione con performance tracking"""
+        """Connection test worker with performance tracking"""
         start_time = time.time()
         try:
             if self.version_var.get() == "3":
@@ -2782,7 +2781,7 @@ CPU Usage: {summary['cpu_percent']}%
             result = client.get("1.3.6.1.2.1.1.1.0")
             response_time = time.time() - start_time
 
-            # Registra performance
+            # Record performance
             self.performance_monitor.record_query(response_time, result is not None)
 
             if result:
@@ -2791,67 +2790,67 @@ CPU Usage: {summary['cpu_percent']}%
                 else:
                     sys_desc = str(result)
 
-                self.logger.info("Test connessione riuscito")
+                self.logger.info("Connection test successful")
                 self.root.after(0, lambda: self._show_test_success(sys_desc, version_info))
             else:
-                self.logger.warning("Test connessione: nessuna risposta")
+                self.logger.warning("Connection test: no response")
                 self.root.after(0, lambda: self._show_test_warning())
 
         except Exception as e:
             self.performance_monitor.record_query(time.time() - start_time, False)
-            self.logger.error(f"Test connessione fallito: {str(e)}")
+            self.logger.error(f"Connection test failed: {str(e)}")
             self.root.after(0, lambda: self._show_test_error(str(e)))
         finally:
             self.root.after(0, self._test_completed)
 
     def _show_test_success(self, sys_desc, version_info):
-        """Mostra successo test"""
+        """Show test success"""
         messagebox.showinfo("Test OK",
-                            f"Connessione SNMP stabilita!\n\n"
-                            f"Protocollo: {version_info}\n"
-                            f"Sistema: {sys_desc[:100]}...")
-        self.status_var.set("Test riuscito")
+                            f"SNMP connection established!\n\n"
+                            f"Protocol: {version_info}\n"
+                            f"System: {sys_desc[:100]}...")
+        self.status_var.set("Test successful")
 
     def _show_test_warning(self):
-        """Mostra warning test"""
+        """Show test warning"""
         messagebox.showwarning("Test",
-                               "Connettività OK ma SNMP non risponde.\n"
-                               "Verificare community/credenziali.")
-        self.status_var.set("SNMP non risponde")
+                               "Connectivity OK but SNMP not responding.\n"
+                               "Check community/credentials.")
+        self.status_var.set("SNMP not responding")
 
     def _show_test_error(self, error_msg):
-        """Mostra errore test"""
-        messagebox.showerror("Test Fallito",
-                             f"Test fallito:\n\n{error_msg}")
-        self.status_var.set("Test fallito")
+        """Show test error"""
+        messagebox.showerror("Test Failed",
+                             f"Test failed:\n\n{error_msg}")
+        self.status_var.set("Test failed")
 
     def _test_completed(self):
-        """Completa test"""
+        """Complete test"""
         self.progress.stop()
         self.scan_btn.config(state=tk.NORMAL)
 
     def test_snmpv3_connection(self):
-        """Test specifico SNMPv3"""
+        """SNMPv3 specific test"""
         self.test_connection()
 
     def discover_engine_id(self):
-        """Scopre Engine ID funzionante"""
+        """Discover working Engine ID"""
         self.scan_btn.config(state=tk.DISABLED)
-        self.status_var.set("Discovery Engine ID...")
+        self.status_var.set("Discovering Engine ID...")
         self.progress.start()
-        self.logger.info("Avvio discovery Engine ID")
+        self.logger.info("Starting Engine ID discovery")
 
         thread = threading.Thread(target=self._discover_engine_worker, daemon=True)
         thread.start()
 
     def _discover_engine_worker(self):
-        """Worker discovery Engine ID"""
+        """Engine ID discovery worker"""
         try:
             host = self.host_var.get()
             port = int(self.port_var.get())
             timeout = float(self.timeout_var.get())
 
-            # Crea utente temporaneo per discovery
+            # Create temporary user for discovery
             temp_user = SnmpV3User(
                 username="",
                 auth_protocol=SnmpV3AuthProtocol.NO_AUTH,
@@ -2871,20 +2870,20 @@ CPU Usage: {summary['cpu_percent']}%
                     'engine_time': processor.engine_time
                 }
 
-                self.logger.info(f"Engine ID scoperto: {engine_id_formatted}")
+                self.logger.info(f"Engine ID discovered: {engine_id_formatted}")
                 self.root.after(0, lambda: self._show_engine_discovery_results(results))
             else:
-                self.logger.warning("Discovery Engine ID fallito")
-                self.root.after(0, lambda: self._show_engine_discovery_error("Nessuna risposta"))
+                self.logger.warning("Engine ID discovery failed")
+                self.root.after(0, lambda: self._show_engine_discovery_error("No response"))
 
         except Exception as e:
-            self.logger.error(f"Errore discovery: {str(e)}")
+            self.logger.error(f"Discovery error: {str(e)}")
             self.root.after(0, lambda: self._show_engine_discovery_error(str(e)))
         finally:
             self.root.after(0, self._discovery_completed)
 
     def _show_engine_discovery_results(self, results):
-        """Mostra risultati discovery"""
+        """Show discovery results"""
         self.v3_engine_id_var.set(results['engine_id'])
 
         result_window = tk.Toplevel(self.root)
@@ -2892,7 +2891,7 @@ CPU Usage: {summary['cpu_percent']}%
         result_window.geometry("500x300")
         result_window.transient(self.root)
 
-        ttk.Label(result_window, text="Engine ID Scoperto!",
+        ttk.Label(result_window, text="Engine ID Discovered!",
                   font=('TkDefaultFont', 12, 'bold')).pack(pady=10)
 
         frame = ttk.Frame(result_window)
@@ -2905,64 +2904,64 @@ CPU Usage: {summary['cpu_percent']}%
         def copy_engine_id():
             self.root.clipboard_clear()
             self.root.clipboard_append(results['engine_id'])
-            messagebox.showinfo("Copiato", "Engine ID copiato!")
+            messagebox.showinfo("Copied", "Engine ID copied!")
 
-        ttk.Button(result_window, text="Copia", command=copy_engine_id).pack(pady=10)
+        ttk.Button(result_window, text="Copy", command=copy_engine_id).pack(pady=10)
         ttk.Button(result_window, text="OK", command=result_window.destroy).pack()
 
     def _show_engine_discovery_error(self, error_msg):
-        """Mostra errore discovery"""
-        messagebox.showerror("Discovery Fallito", f"Impossibile scoprire Engine ID:\n{error_msg}")
-        self.status_var.set("Discovery fallito")
+        """Show discovery error"""
+        messagebox.showerror("Discovery Failed", f"Unable to discover Engine ID:\n{error_msg}")
+        self.status_var.set("Discovery failed")
 
     def _discovery_completed(self):
-        """Completa discovery"""
+        """Complete discovery"""
         self.progress.stop()
         self.scan_btn.config(state=tk.NORMAL)
 
     def start_scan(self):
-        """Avvia scansione con validazione completa"""
+        """Start scan with complete validation"""
         if self.scanning:
             return
 
-        # Validazione
+        # Validation
         valid, error = self.validate_input()
         if not valid:
-            messagebox.showerror("Errore", error)
+            messagebox.showerror("Error", error)
             return
 
-        # Avvia scansione
+        # Start scan
         self.scanning = True
         self.scan_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
         self.progress.start()
-        self.status_var.set("Scansione in corso...")
+        self.status_var.set("Scanning...")
 
-        # Pulisci risultati
+        # Clear results
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
         self.scan_results = {}
 
-        # Inizializza scanner con limiti
+        # Initialize scanner with limits
         self.memory_scanner = MemoryLimitedScanner(
             int(self.max_results_var.get()),
             int(self.max_memory_var.get())
         )
 
-        self.logger.info(f"Avvio scansione {self.host_var.get()} con SNMPv{self.version_var.get()}")
+        self.logger.info(f"Starting scan {self.host_var.get()} with SNMPv{self.version_var.get()}")
 
-        # Thread scansione
+        # Scan thread
         self.scan_thread = threading.Thread(target=self._scan_worker, daemon=True)
         self.scan_thread.start()
 
     def _scan_worker(self):
-        """Worker scansione con gestione errori robusta e performance tracking"""
+        """Scan worker with robust error handling and performance tracking"""
         start_time = time.time()
         errors = []
         successful_oids = 0
 
         try:
-            # Crea client
+            # Create client
             if self.version_var.get() == "3":
                 self.client = self.create_snmpv3_client()
             else:
@@ -2976,7 +2975,7 @@ CPU Usage: {summary['cpu_percent']}%
                     int(self.retries_var.get())
                 )
 
-            # OID da scansionare
+            # OIDs to scan
             oids = [
                 "1.3.6.1.2.1.1",  # System
                 "1.3.6.1.2.1.2",  # Interfaces
@@ -2997,24 +2996,24 @@ CPU Usage: {summary['cpu_percent']}%
 
             for base_oid in oids:
                 if not self.scanning:
-                    self.logger.info("Scansione interrotta dall'utente")
+                    self.logger.info("Scan interrupted by user")
                     break
 
-                # Check limiti memoria
+                # Check memory limits
                 ok, msg = self.memory_scanner.check_limits()
                 if not ok:
-                    self.logger.warning(f"Limite raggiunto: {msg}")
-                    self.root.after(0, lambda m=msg: messagebox.showwarning("Limite", m))
+                    self.logger.warning(f"Limit reached: {msg}")
+                    self.root.after(0, lambda m=msg: messagebox.showwarning("Limit", m))
                     break
 
                 try:
                     self.root.after(0, lambda o=base_oid, p=processed, t=total_oids:
-                    self.status_var.set(f"Scansione {o}... ({p}/{t})"))
+                    self.status_var.set(f"Scanning {o}... ({p}/{t})"))
 
-                    # Timer per performance
+                    # Timer for performance
                     oid_start = time.time()
 
-                    # Esegui walk
+                    # Execute walk
                     if self.version_var.get() == "2c" or self.version_var.get() == "3":
                         results = self.client.bulk_walk(base_oid, max_repetitions=20)
                     else:
@@ -3022,18 +3021,18 @@ CPU Usage: {summary['cpu_percent']}%
 
                     oid_time = time.time() - oid_start
 
-                    # Registra performance
+                    # Record performance
                     self.performance_monitor.record_query(oid_time, len(results) > 0)
 
-                    # Processa risultati
+                    # Process results
                     for oid, value in results.items():
                         if not self.scanning:
                             break
 
-                        # Check limiti
+                        # Check limits
                         ok, msg = self.memory_scanner.check_limits()
                         if not ok:
-                            self.logger.warning(f"Limite durante processing: {msg}")
+                            self.logger.warning(f"Limit during processing: {msg}")
                             break
 
                         self.scan_results[oid] = {
@@ -3048,60 +3047,60 @@ CPU Usage: {summary['cpu_percent']}%
 
                     if results:
                         successful_oids += 1
-                        self.logger.info(f"OID {base_oid}: {len(results)} risultati")
+                        self.logger.info(f"OID {base_oid}: {len(results)} results")
 
                 except socket.timeout:
-                    error = f"Timeout su {base_oid}"
+                    error = f"Timeout on {base_oid}"
                     errors.append(error)
                     self.logger.warning(error)
                     self.performance_monitor.record_query(self.timeout_var.get(), False)
                 except Exception as e:
-                    error = f"Errore {base_oid}: {str(e)}"
+                    error = f"Error {base_oid}: {str(e)}"
                     errors.append(error)
                     self.logger.error(error)
                     self.performance_monitor.record_query(0, False)
 
                 processed += 1
 
-                # Check timeout globale
-                if time.time() - start_time > 300:  # 5 minuti
-                    self.logger.warning("Timeout globale scansione (5 minuti)")
+                # Check global timeout
+                if time.time() - start_time > 300:  # 5 minutes
+                    self.logger.warning("Global scan timeout (5 minutes)")
                     self.root.after(0, lambda: messagebox.showwarning(
-                        "Timeout", "Scansione interrotta dopo 5 minuti"))
+                        "Timeout", "Scan interrupted after 5 minutes"))
                     break
 
-            # Report finale
+            # Final report
             scan_time = time.time() - start_time
             total_results = len(self.scan_results)
 
-            self.logger.info(f"Scansione completata: {total_results} risultati in {scan_time:.1f}s")
+            self.logger.info(f"Scan completed: {total_results} results in {scan_time:.1f}s")
 
             if errors:
-                self.logger.warning(f"Completata con {len(errors)} errori")
+                self.logger.warning(f"Completed with {len(errors)} errors")
                 error_summary = "\n".join(errors[:5])
                 self.root.after(0, lambda: self.status_var.set(
-                    f"Completato con {len(errors)} errori in {scan_time:.1f}s"))
+                    f"Completed with {len(errors)} errors in {scan_time:.1f}s"))
             else:
                 self.root.after(0, lambda: self.status_var.set(
-                    f"Scansione OK: {total_results} risultati in {scan_time:.1f}s"))
+                    f"Scan OK: {total_results} results in {scan_time:.1f}s"))
 
             self.root.after(0, self._scan_completed)
 
         except Exception as e:
-            self.logger.error(f"Errore critico scansione: {str(e)}\n{traceback.format_exc()}")
-            self.root.after(0, lambda: self._scan_error(f"Errore critico: {str(e)}"))
+            self.logger.error(f"Critical scan error: {str(e)}\n{traceback.format_exc()}")
+            self.root.after(0, lambda: self._scan_error(f"Critical error: {str(e)}"))
 
     def _add_result_to_tree(self, oid, value):
-        """Aggiunge risultato al tree con nome MIB migliorato"""
+        """Add result to tree with improved MIB name"""
         try:
-            # Usa MIB parser per nome
+            # Use MIB parser for name
             name = self.mib_parser.get_name(oid)
             if not name:
                 name = self._get_oid_description(oid)
                 
             value_type = type(value).__name__
 
-            # Formatta valore
+            # Format value
             if isinstance(value, SnmpOctetString):
                 try:
                     display_value = value.value.decode('utf-8')
@@ -3122,34 +3121,34 @@ CPU Usage: {summary['cpu_percent']}%
             ))
 
             total = len(self.results_tree.get_children())
-            self.info_var.set(f"Risultati: {total}")
+            self.info_var.set(f"Results: {total}")
 
         except Exception as e:
-            self.logger.error(f"Errore aggiunta risultato: {e}")
+            self.logger.error(f"Error adding result: {e}")
 
     def _get_oid_description(self, oid):
-        """Ottiene descrizione OID migliorata con supporto MIB parser"""
-        # Prima controlla MIB parser
+        """Get improved OID description with MIB parser support"""
+        # First check MIB parser
         mib_name = self.mib_parser.get_name(oid)
         if mib_name:
             return mib_name
             
-        # Poi controlla il dizionario esatto
+        # Then check exact dictionary
         if oid in self.oid_names:
             return self.oid_names[oid]
         
-        # Poi cerca corrispondenze parziali
+        # Then look for partial matches
         oid_parts = oid.split('.')
         for i in range(len(oid_parts), 0, -1):
             partial = '.'.join(oid_parts[:i])
             if partial in self.oid_names:
-                # Se trovato, aggiungi l'indice se presente
+                # If found, add index if present
                 if i < len(oid_parts):
                     suffix = '.'.join(oid_parts[i:])
                     return f"{self.oid_names[partial]}.{suffix}"
                 return self.oid_names[partial]
         
-        # Se non trovato, cerca di identificare la categoria principale
+        # If not found, try to identify main category
         if oid.startswith("1.3.6.1.2.1.1"):
             return "system"
         elif oid.startswith("1.3.6.1.2.1.2"):
@@ -3174,40 +3173,40 @@ CPU Usage: {summary['cpu_percent']}%
         return ""
 
     def _scan_completed(self):
-        """Completa scansione"""
+        """Complete scan"""
         self.scanning = False
         self.scan_btn.config(state=tk.NORMAL)
         self.stop_btn.config(state=tk.DISABLED)
         self.progress.stop()
 
         total = len(self.results_tree.get_children())
-        self.status_var.set(f"Scansione completata - {total} risultati")
+        self.status_var.set(f"Scan completed - {total} results")
         self.save_config()
 
     def _scan_error(self, error_msg):
-        """Gestisce errore scansione"""
+        """Handle scan error"""
         self.scanning = False
         self.scan_btn.config(state=tk.NORMAL)
         self.stop_btn.config(state=tk.DISABLED)
         self.progress.stop()
-        self.status_var.set(f"Errore: {error_msg}")
-        messagebox.showerror("Errore Scansione", error_msg)
+        self.status_var.set(f"Error: {error_msg}")
+        messagebox.showerror("Scan Error", error_msg)
 
     def stop_scan(self):
-        """Ferma scansione"""
+        """Stop scan"""
         self.scanning = False
-        self.status_var.set("Interruzione...")
-        self.logger.info("Scansione interrotta dall'utente")
+        self.status_var.set("Stopping...")
+        self.logger.info("Scan interrupted by user")
 
     def walk_from_selected(self):
-        """WALK da elemento selezionato con performance tracking"""
+        """WALK from selected element with performance tracking"""
         selection = self.results_tree.selection()
         if not selection:
-            messagebox.showwarning("Avviso", "Seleziona un elemento")
+            messagebox.showwarning("Warning", "Select an element")
             return
 
         if not self.client:
-            messagebox.showerror("Errore", "Effettua prima una scansione")
+            messagebox.showerror("Error", "Perform a scan first")
             return
 
         item = selection[0]
@@ -3217,19 +3216,19 @@ CPU Usage: {summary['cpu_percent']}%
 
         oid = values[0]
 
-        # Conferma per walk potenzialmente grandi
-        if not messagebox.askyesno("WALK", f"Eseguire WALK da:\n{oid}\n\nPotrebbe generare molti risultati."):
+        # Confirm for potentially large walks
+        if not messagebox.askyesno("WALK", f"Execute WALK from:\n{oid}\n\nThis may generate many results."):
             return
 
-        # Pulisci risultati
+        # Clear results
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
 
-        self.status_var.set(f"WALK da {oid}...")
+        self.status_var.set(f"WALK from {oid}...")
         self.progress.start()
-        self.logger.info(f"WALK da OID: {oid}")
+        self.logger.info(f"WALK from OID: {oid}")
 
-        # Thread per WALK
+        # Thread for WALK
         def walk_worker():
             start_time = time.time()
             try:
@@ -3245,33 +3244,33 @@ CPU Usage: {summary['cpu_percent']}%
                 for walk_oid, value in results.items():
                     if count >= int(self.max_results_var.get()):
                         self.root.after(0, lambda: messagebox.showwarning(
-                            "Limite", f"Raggiunto limite di {self.max_results_var.get()} risultati"))
+                            "Limit", f"Reached limit of {self.max_results_var.get()} results"))
                         break
 
                     self.root.after(0, self._add_result_to_tree, walk_oid, value)
                     count += 1
 
-                self.logger.info(f"WALK completato: {count} risultati in {response_time:.2f}s")
+                self.logger.info(f"WALK completed: {count} results in {response_time:.2f}s")
                 self.root.after(0, lambda: self.progress.stop())
-                self.root.after(0, lambda: self.status_var.set(f"✅ WALK completato - {count} risultati"))
+                self.root.after(0, lambda: self.status_var.set(f"✅ WALK completed - {count} results"))
 
             except Exception as e:
                 self.performance_monitor.record_query(time.time() - start_time, False)
-                self.logger.error(f"Errore WALK: {str(e)}")
+                self.logger.error(f"WALK error: {str(e)}")
                 self.root.after(0, lambda: self.progress.stop())
-                self.root.after(0, lambda: messagebox.showerror("Errore WALK", str(e)))
+                self.root.after(0, lambda: messagebox.showerror("WALK Error", str(e)))
 
         threading.Thread(target=walk_worker, daemon=True).start()
 
     def set_value(self):
-        """SET valore SNMP con tracking"""
+        """SET SNMP value with tracking"""
         selection = self.results_tree.selection()
         if not selection:
-            messagebox.showwarning("Avviso", "Seleziona un elemento")
+            messagebox.showwarning("Warning", "Select an element")
             return
 
         if not self.client:
-            messagebox.showerror("Errore", "Effettua prima una scansione")
+            messagebox.showerror("Error", "Perform a scan first")
             return
 
         item = selection[0]
@@ -3283,38 +3282,38 @@ CPU Usage: {summary['cpu_percent']}%
         current_value = values[3]
         current_type = values[2]
 
-        # Dialog per nuovo valore
+        # Dialog for new value
         dialog = tk.Toplevel(self.root)
-        dialog.title("SET Valore SNMP")
+        dialog.title("SET SNMP Value")
         dialog.geometry("450x350")
         dialog.transient(self.root)
         dialog.grab_set()
 
-        # Info OID
-        info_frame = ttk.LabelFrame(dialog, text="Informazioni OID")
+        # OID info
+        info_frame = ttk.LabelFrame(dialog, text="OID Information")
         info_frame.pack(fill=tk.X, padx=10, pady=10)
 
         ttk.Label(info_frame, text=f"OID: {oid}", font=('TkDefaultFont', 9)).pack(anchor=tk.W, padx=5, pady=2)
-        ttk.Label(info_frame, text=f"Tipo attuale: {current_type}").pack(anchor=tk.W, padx=5, pady=2)
-        ttk.Label(info_frame, text=f"Valore attuale: {current_value}").pack(anchor=tk.W, padx=5, pady=2)
+        ttk.Label(info_frame, text=f"Current Type: {current_type}").pack(anchor=tk.W, padx=5, pady=2)
+        ttk.Label(info_frame, text=f"Current Value: {current_value}").pack(anchor=tk.W, padx=5, pady=2)
 
-        # Frame nuovo valore
-        value_frame = ttk.LabelFrame(dialog, text="Nuovo Valore")
+        # New value frame
+        value_frame = ttk.LabelFrame(dialog, text="New Value")
         value_frame.pack(fill=tk.X, padx=10, pady=10)
 
-        ttk.Label(value_frame, text="Valore:").pack(anchor=tk.W, padx=5, pady=5)
+        ttk.Label(value_frame, text="Value:").pack(anchor=tk.W, padx=5, pady=5)
         new_value_var = tk.StringVar(value=current_value)
         value_entry = ttk.Entry(value_frame, textvariable=new_value_var, width=40)
         value_entry.pack(padx=5, pady=5)
 
-        ttk.Label(value_frame, text="Tipo dato:").pack(anchor=tk.W, padx=5, pady=5)
+        ttk.Label(value_frame, text="Data Type:").pack(anchor=tk.W, padx=5, pady=5)
         type_var = tk.StringVar(value="String")
         type_combo = ttk.Combobox(value_frame, textvariable=type_var, state='readonly',
                                   values=["String", "Integer", "IPAddress", "OID", "Gauge", "Counter"])
         type_combo.pack(padx=5, pady=5)
 
         # Warning
-        warning_label = ttk.Label(dialog, text="ATTENZIONE: SET modifica valori sul dispositivo!",
+        warning_label = ttk.Label(dialog, text="WARNING: SET modifies values on the device!",
                                   foreground="red")
         warning_label.pack(pady=10)
 
@@ -3324,7 +3323,7 @@ CPU Usage: {summary['cpu_percent']}%
                 new_val = new_value_var.get()
                 val_type = type_var.get()
 
-                # Crea valore SNMP appropriato
+                # Create appropriate SNMP value
                 if val_type == "Integer":
                     snmp_value = SnmpInteger(int(new_val))
                 elif val_type == "IPAddress":
@@ -3341,43 +3340,43 @@ CPU Usage: {summary['cpu_percent']}%
                 else:
                     snmp_value = SnmpOctetString(new_val.encode())
 
-                # Log operazione
+                # Log operation
                 self.logger.info(f"SET {oid} = {new_val} ({val_type})")
 
-                # Esegui SET
+                # Execute SET
                 if self.client.set(oid, snmp_value):
                     response_time = time.time() - start_time
                     self.performance_monitor.record_query(response_time, True)
                     
-                    messagebox.showinfo("SET OK", "Valore impostato con successo!")
+                    messagebox.showinfo("SET OK", "Value set successfully!")
                     dialog.destroy()
 
-                    # Aggiorna valore nel tree
+                    # Update value in tree
                     self.get_single_oid(oid)
-                    self.logger.info(f"SET completato con successo in {response_time:.3f}s")
+                    self.logger.info(f"SET completed successfully in {response_time:.3f}s")
                 else:
                     self.performance_monitor.record_query(time.time() - start_time, False)
-                    messagebox.showerror("SET Fallito", "Impossibile impostare il valore")
-                    self.logger.error("SET fallito")
+                    messagebox.showerror("SET Failed", "Unable to set value")
+                    self.logger.error("SET failed")
 
             except Exception as e:
                 self.performance_monitor.record_query(time.time() - start_time, False)
-                error_msg = f"Errore SET: {str(e)}"
+                error_msg = f"SET error: {str(e)}"
                 self.logger.error(error_msg)
-                messagebox.showerror("Errore", error_msg)
+                messagebox.showerror("Error", error_msg)
 
-        # Pulsanti
+        # Buttons
         btn_frame = ttk.Frame(dialog)
         btn_frame.pack(pady=10)
 
-        ttk.Button(btn_frame, text="Applica", command=do_set).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Annulla", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Apply", command=do_set).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
 
     def get_selected(self):
-        """GET su elemento selezionato"""
+        """GET on selected element"""
         selection = self.results_tree.selection()
         if not selection:
-            messagebox.showwarning("Avviso", "Seleziona elemento")
+            messagebox.showwarning("Warning", "Select element")
             return
 
         item = selection[0]
@@ -3386,9 +3385,9 @@ CPU Usage: {summary['cpu_percent']}%
             self.get_single_oid(values[0])
 
     def get_single_oid(self, oid):
-        """GET singolo OID con performance tracking"""
+        """GET single OID with performance tracking"""
         if not self.client:
-            messagebox.showerror("Errore", "Effettua prima una scansione")
+            messagebox.showerror("Error", "Perform a scan first")
             return
 
         start_time = time.time()
@@ -3407,11 +3406,11 @@ CPU Usage: {summary['cpu_percent']}%
 
                 messagebox.showinfo("GET Result",
                                     f"OID: {oid}\n"
-                                    f"Valore: {value}\n"
-                                    f"Tipo: {type(result).__name__}\n"
-                                    f"Tempo risposta: {response_time:.3f}s")
+                                    f"Value: {value}\n"
+                                    f"Type: {type(result).__name__}\n"
+                                    f"Response time: {response_time:.3f}s")
 
-                # Aggiorna nel tree se presente
+                # Update in tree if present
                 for item in self.results_tree.get_children():
                     item_values = self.results_tree.item(item)['values']
                     if item_values and item_values[0] == oid:
@@ -3422,21 +3421,21 @@ CPU Usage: {summary['cpu_percent']}%
                         break
             else:
                 self.performance_monitor.record_query(response_time, False)
-                messagebox.showwarning("GET Result", f"Nessun valore per: {oid}")
+                messagebox.showwarning("GET Result", f"No value for: {oid}")
 
         except Exception as e:
             self.performance_monitor.record_query(time.time() - start_time, False)
-            self.logger.error(f"Errore GET: {str(e)}")
-            messagebox.showerror("Errore GET", str(e))
+            self.logger.error(f"GET error: {str(e)}")
+            messagebox.showerror("GET Error", str(e))
 
     def full_walk(self):
-        """Walk completo con performance tracking"""
-        if not messagebox.askyesno("Walk Completo",
-                                   "Il walk completo può richiedere MOLTO tempo e memoria.\n\n"
-                                   "Continuare?"):
+        """Complete walk with performance tracking"""
+        if not messagebox.askyesno("Full Walk",
+                                   "Full walk can take A LONG time and memory.\n\n"
+                                   "Continue?"):
             return
 
-        # Pulisci risultati
+        # Clear results
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
         self.scan_results.clear()
@@ -3445,20 +3444,20 @@ CPU Usage: {summary['cpu_percent']}%
         self.scan_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
         self.progress.start()
-        self.status_var.set("Walk completo in corso...")
+        self.status_var.set("Full walk in progress...")
 
-        # Inizializza scanner con limiti
+        # Initialize scanner with limits
         self.memory_scanner = MemoryLimitedScanner(
             int(self.max_results_var.get()),
             int(self.max_memory_var.get())
         )
 
-        self.logger.info("Avvio walk completo")
+        self.logger.info("Starting full walk")
 
         def walk_worker():
             start_time = time.time()
             try:
-                # Crea client
+                # Create client
                 if self.version_var.get() == "3":
                     client = self.create_snmpv3_client()
                 else:
@@ -3472,8 +3471,8 @@ CPU Usage: {summary['cpu_percent']}%
                         int(self.retries_var.get())
                     )
 
-                # Walk dalla radice
-                self.logger.info("Walk da OID radice: 1")
+                # Walk from root
+                self.logger.info("Walk from root OID: 1")
 
                 if self.version_var.get() == "2c" or self.version_var.get() == "3":
                     results = client.bulk_walk("1", max_repetitions=50)
@@ -3483,18 +3482,18 @@ CPU Usage: {summary['cpu_percent']}%
                 response_time = time.time() - start_time
                 self.performance_monitor.record_query(response_time, len(results) > 0)
 
-                # Aggiungi risultati con controllo limiti
+                # Add results with limit checking
                 count = 0
                 for oid, value in results.items():
                     if not self.scanning:
-                        self.logger.info("Walk interrotto dall'utente")
+                        self.logger.info("Walk interrupted by user")
                         break
 
-                    # Check limiti
+                    # Check limits
                     ok, msg = self.memory_scanner.check_limits()
                     if not ok:
-                        self.logger.warning(f"Walk interrotto per limite: {msg}")
-                        self.root.after(0, lambda m=msg: messagebox.showwarning("Limite", m))
+                        self.logger.warning(f"Walk interrupted due to limit: {msg}")
+                        self.root.after(0, lambda m=msg: messagebox.showwarning("Limit", m))
                         break
 
                     self.scan_results[oid] = {
@@ -3509,15 +3508,15 @@ CPU Usage: {summary['cpu_percent']}%
 
                     count += 1
                     if count % 100 == 0:
-                        self.root.after(0, lambda c=count: self.status_var.set(f"Walk: {c} OID trovati..."))
+                        self.root.after(0, lambda c=count: self.status_var.set(f"Walk: {c} OIDs found..."))
 
-                self.logger.info(f"Walk completato: {count} OID in {response_time:.1f}s")
-                self.root.after(0, lambda c=count: self.status_var.set(f"Walk completato: {c} OID"))
+                self.logger.info(f"Walk completed: {count} OIDs in {response_time:.1f}s")
+                self.root.after(0, lambda c=count: self.status_var.set(f"Walk completed: {c} OIDs"))
 
             except Exception as e:
                 self.performance_monitor.record_query(time.time() - start_time, False)
-                self.logger.error(f"Errore walk completo: {str(e)}")
-                self.root.after(0, lambda: messagebox.showerror("Errore Walk", str(e)))
+                self.logger.error(f"Full walk error: {str(e)}")
+                self.root.after(0, lambda: messagebox.showerror("Walk Error", str(e)))
             finally:
                 self.scanning = False
                 self.root.after(0, lambda: self.scan_btn.config(state=tk.NORMAL))
@@ -3527,18 +3526,18 @@ CPU Usage: {summary['cpu_percent']}%
         threading.Thread(target=walk_worker, daemon=True).start()
 
     def refresh_dashboard(self):
-        """Aggiorna dashboard con performance tracking"""
+        """Refresh dashboard with performance tracking"""
         if not self.saved_values:
-            self.status_var.set("Dashboard vuoto")
+            self.status_var.set("Dashboard empty")
             return
 
-        # Pulisci dashboard
+        # Clear dashboard
         for item in self.dashboard_tree.get_children():
             self.dashboard_tree.delete(item)
 
-        self.status_var.set("Aggiornamento dashboard...")
+        self.status_var.set("Refreshing dashboard...")
         self.progress.start()
-        self.logger.info(f"Aggiornamento dashboard: {len(self.saved_values)} elementi")
+        self.logger.info(f"Refreshing dashboard: {len(self.saved_values)} items")
 
         def refresh_worker():
             try:
@@ -3548,19 +3547,19 @@ CPU Usage: {summary['cpu_percent']}%
                 for key, config in self.saved_values.items():
                     start_time = time.time()
                     try:
-                        # Crea client per questo host
+                        # Create client for this host
                         if config.get('version') == '3':
-                            # Usa credenziali salvate (decriptate)
+                            # Use saved (decrypted) credentials
                             if 'v3_config' in config:
                                 v3_config = config['v3_config']
 
-                                # Decripta password
+                                # Decrypt passwords
                                 auth_pass = self.credential_manager.decrypt_password(
                                     v3_config.get('auth_password_encrypted', ''))
                                 priv_pass = self.credential_manager.decrypt_password(
                                     v3_config.get('priv_password_encrypted', ''))
 
-                                # Crea user v3
+                                # Create v3 user
                                 user = SnmpV3User(
                                     username=v3_config.get('username', ''),
                                     auth_protocol=SnmpV3AuthProtocol[v3_config.get('auth_protocol', 'NO_AUTH')],
@@ -3590,7 +3589,7 @@ CPU Usage: {summary['cpu_percent']}%
                                 int(self.retries_var.get())
                             )
 
-                        # Get valore
+                        # Get value
                         result = client.get(config['oid'])
                         response_time = time.time() - start_time
                         
@@ -3610,7 +3609,7 @@ CPU Usage: {summary['cpu_percent']}%
 
                         timestamp = time.strftime("%H:%M:%S")
 
-                        # Aggiungi al dashboard
+                        # Add to dashboard
                         self.root.after(0, lambda h=config['host'], o=config['oid'],
                                                   n=config['name'], v=value, t=timestamp, s=status:
                         self.dashboard_tree.insert("", tk.END, values=(h, o, n, v, t, s)))
@@ -3624,29 +3623,29 @@ CPU Usage: {summary['cpu_percent']}%
                                                    values=(
                                                    h, o, n, f"Error: {e[:30]}...", time.strftime("%H:%M:%S"), "error")))
 
-                # Report finale
+                # Final report
                 total = len(self.saved_values)
-                self.logger.info(f"Dashboard aggiornato: {success}/{total} OK")
+                self.logger.info(f"Dashboard refreshed: {success}/{total} OK")
 
                 if errors:
                     self.root.after(0, lambda: self.status_var.set(
-                        f"Dashboard: {success}/{total} OK, {len(errors)} errori"))
+                        f"Dashboard: {success}/{total} OK, {len(errors)} errors"))
                 else:
                     self.root.after(0, lambda: self.status_var.set(
-                        f"Dashboard aggiornato: {total} elementi"))
+                        f"Dashboard refreshed: {total} items"))
 
             except Exception as e:
-                self.logger.error(f"Errore aggiornamento dashboard: {str(e)}")
-                self.root.after(0, lambda: messagebox.showerror("Errore Dashboard", str(e)))
+                self.logger.error(f"Dashboard refresh error: {str(e)}")
+                self.root.after(0, lambda: messagebox.showerror("Dashboard Error", str(e)))
             finally:
                 self.root.after(0, lambda: self.progress.stop())
 
         threading.Thread(target=refresh_worker, daemon=True).start()
 
     def export_results(self):
-        """Esporta risultati in TUTTI i formati"""
+        """Export results in ALL formats"""
         if not self.scan_results:
-            messagebox.showwarning("Avviso", "Nessun risultato da esportare")
+            messagebox.showwarning("Warning", "No results to export")
             return
 
         filename = filedialog.asksaveasfilename(
@@ -3666,10 +3665,10 @@ CPU Usage: {summary['cpu_percent']}%
             return
 
         try:
-            self.logger.info(f"Export risultati in: {filename}")
+            self.logger.info(f"Exporting results to: {filename}")
 
             if filename.endswith('.json'):
-                # Export JSON con metriche performance
+                # Export JSON with performance metrics
                 export_data = {
                     'metadata': {
                         'host': self.host_var.get(),
@@ -3698,7 +3697,7 @@ CPU Usage: {summary['cpu_percent']}%
                 import csv
                 with open(filename, 'w', newline='', encoding='utf-8') as f:
                     writer = csv.writer(f)
-                    writer.writerow(['OID', 'Nome', 'Tipo', 'Valore', 'Stato', 'Timestamp'])
+                    writer.writerow(['OID', 'Name', 'Type', 'Value', 'Status', 'Timestamp'])
 
                     for item in self.results_tree.get_children():
                         values = self.results_tree.item(item)['values']
@@ -3706,7 +3705,7 @@ CPU Usage: {summary['cpu_percent']}%
                             writer.writerow(values)
 
             elif filename.endswith('.html'):
-                # Export HTML avanzato
+                # Advanced HTML export
                 with open(filename, 'w', encoding='utf-8') as f:
                     perf_summary = self.performance_monitor.get_summary()
                     f.write("""<!DOCTYPE html>
@@ -3881,14 +3880,14 @@ CPU Usage: {summary['cpu_percent']}%
                             f.write(f"Timestamp: {values[5]}\n")
                             f.write("-" * 40 + "\n\n")
 
-            self.logger.info(f"Export completato: {os.path.basename(filename)}")
-            messagebox.showinfo("Export Completato",
-                                f"Risultati esportati con successo!\n\n"
+            self.logger.info(f"Export completed: {os.path.basename(filename)}")
+            messagebox.showinfo("Export Complete",
+                                f"Results exported successfully!\n\n"
                                 f"File: {os.path.basename(filename)}\n"
-                                f"Totale: {len(self.scan_results)} risultati")
+                                f"Total: {len(self.scan_results)} results")
 
-            # Chiedi se aprire
-            if messagebox.askyesno("Apri File", "Vuoi aprire il file esportato?"):
+            # Ask if open file
+            if messagebox.askyesno("Open File", "Do you want to open the exported file?"):
                 if sys.platform.startswith('win'):
                     os.startfile(filename)
                 elif sys.platform.startswith('darwin'):
@@ -3897,11 +3896,11 @@ CPU Usage: {summary['cpu_percent']}%
                     os.system(f'xdg-open "{filename}"')
 
         except Exception as e:
-            self.logger.error(f"Errore export: {str(e)}")
-            messagebox.showerror("Errore Export", f"Errore durante export:\n{str(e)}")
+            self.logger.error(f"Export error: {str(e)}")
+            messagebox.showerror("Export Error", f"Export error:\n{str(e)}")
 
     def save_config(self):
-        """Salva configurazione con credenziali criptate"""
+        """Save configuration with encrypted credentials"""
         config = {
             'host': self.host_var.get(),
             'community': self.community_var.get(),
@@ -3916,7 +3915,7 @@ CPU Usage: {summary['cpu_percent']}%
         }
 
         if self.version_var.get() == "3":
-            # Cripta password v3
+            # Encrypt v3 passwords
             config['v3_user'] = self.v3_user_var.get()
             config['v3_auth_protocol'] = self.v3_auth_protocol_var.get()
             config['v3_auth_password_encrypted'] = self.credential_manager.encrypt_password(
@@ -3929,12 +3928,12 @@ CPU Usage: {summary['cpu_percent']}%
         try:
             with open(self.config_file, 'w') as f:
                 json.dump(config, f, indent=2)
-            self.logger.info("Configurazione salvata")
+            self.logger.info("Configuration saved")
         except Exception as e:
-            self.logger.error(f"Errore salvataggio config: {e}")
+            self.logger.error(f"Error saving config: {e}")
 
     def load_config(self):
-        """Carica configurazione con decriptazione"""
+        """Load configuration with decryption"""
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r') as f:
@@ -3955,7 +3954,7 @@ CPU Usage: {summary['cpu_percent']}%
                     self.v3_user_var.set(config.get('v3_user', ''))
                     self.v3_auth_protocol_var.set(config.get('v3_auth_protocol', 'noAuth'))
 
-                    # Decripta password
+                    # Decrypt passwords
                     if 'v3_auth_password_encrypted' in config:
                         auth_pass = self.credential_manager.decrypt_password(
                             config['v3_auth_password_encrypted'])
@@ -3970,48 +3969,48 @@ CPU Usage: {summary['cpu_percent']}%
 
                     self.v3_engine_id_var.set(config.get('v3_engine_id', ''))
 
-                self.logger.info("Configurazione caricata")
+                self.logger.info("Configuration loaded")
 
         except Exception as e:
-            self.logger.error(f"Errore caricamento config: {e}")
+            self.logger.error(f"Error loading config: {e}")
 
     def show_settings(self):
-        """Mostra dialog impostazioni avanzate"""
+        """Show advanced settings dialog"""
         settings_window = tk.Toplevel(self.root)
-        settings_window.title("Impostazioni")
+        settings_window.title("Settings")
         settings_window.geometry("450x550")
         settings_window.transient(self.root)
         settings_window.grab_set()
 
-        # Notebook per categorie
+        # Notebook for categories
         notebook = ttk.Notebook(settings_window)
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Tab Limiti
+        # Limits Tab
         limits_frame = ttk.Frame(notebook)
-        notebook.add(limits_frame, text="Limiti")
+        notebook.add(limits_frame, text="Limits")
 
-        ttk.Label(limits_frame, text="Limiti Scansione:",
+        ttk.Label(limits_frame, text="Scan Limits:",
                   font=('TkDefaultFont', 10, 'bold')).pack(pady=10)
 
         limits_info = ttk.Frame(limits_frame)
         limits_info.pack(padx=20, pady=10)
 
-        ttk.Label(limits_info, text="Max Risultati:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(limits_info, text="Max Results:").grid(row=0, column=0, sticky=tk.W, pady=5)
         ttk.Entry(limits_info, textvariable=self.max_results_var, width=10).grid(row=0, column=1, padx=10)
 
-        ttk.Label(limits_info, text="Max Memoria (MB):").grid(row=1, column=0, sticky=tk.W, pady=5)
+        ttk.Label(limits_info, text="Max Memory (MB):").grid(row=1, column=0, sticky=tk.W, pady=5)
         ttk.Entry(limits_info, textvariable=self.max_memory_var, width=10).grid(row=1, column=1, padx=10)
 
-        # Tab Logging
+        # Logging Tab
         log_frame = ttk.Frame(notebook)
         notebook.add(log_frame, text="Logging")
 
-        ttk.Label(log_frame, text="Configurazione Log:",
+        ttk.Label(log_frame, text="Log Configuration:",
                   font=('TkDefaultFont', 10, 'bold')).pack(pady=10)
 
         log_level_var = tk.StringVar(value="INFO")
-        ttk.Label(log_frame, text="Livello Log:").pack()
+        ttk.Label(log_frame, text="Log Level:").pack()
         ttk.Combobox(log_frame, textvariable=log_level_var,
                      values=["DEBUG", "INFO", "WARNING", "ERROR"],
                      state='readonly').pack(pady=5)
@@ -4019,70 +4018,70 @@ CPU Usage: {summary['cpu_percent']}%
         def apply_log_level():
             level = getattr(logging, log_level_var.get())
             self.logger.setLevel(level)
-            messagebox.showinfo("OK", f"Livello log impostato a {log_level_var.get()}")
+            messagebox.showinfo("OK", f"Log level set to {log_level_var.get()}")
 
-        ttk.Button(log_frame, text="Applica", command=apply_log_level).pack(pady=10)
+        ttk.Button(log_frame, text="Apply", command=apply_log_level).pack(pady=10)
 
-        # Tab Sicurezza
+        # Security Tab
         security_frame = ttk.Frame(notebook)
-        notebook.add(security_frame, text="Sicurezza")
+        notebook.add(security_frame, text="Security")
 
-        ttk.Label(security_frame, text="Opzioni Sicurezza:",
+        ttk.Label(security_frame, text="Security Options:",
                   font=('TkDefaultFont', 10, 'bold')).pack(pady=10)
 
         def clear_passwords():
-            """Cancella password dalla memoria"""
+            """Clear passwords from memory"""
             self.v3_auth_password_var.set("")
             self.v3_priv_password_var.set("")
 
-            # Forza garbage collection
+            # Force garbage collection
             self.credential_manager.secure_delete(self.v3_auth_password_var.get())
             self.credential_manager.secure_delete(self.v3_priv_password_var.get())
 
             gc.collect()
-            messagebox.showinfo("OK", "Password cancellate dalla memoria")
+            messagebox.showinfo("OK", "Passwords cleared from memory")
 
-        ttk.Button(security_frame, text="Cancella Password dalla Memoria",
+        ttk.Button(security_frame, text="Clear Passwords from Memory",
                    command=clear_passwords).pack(pady=10)
 
-        # Tab Performance
+        # Performance Tab
         perf_frame = ttk.Frame(notebook)
         notebook.add(perf_frame, text="Performance")
         
-        ttk.Label(perf_frame, text="Opzioni Performance:",
+        ttk.Label(perf_frame, text="Performance Options:",
                   font=('TkDefaultFont', 10, 'bold')).pack(pady=10)
         
         perf_info = ttk.Frame(perf_frame)
         perf_info.pack(padx=20, pady=10)
         
-        ttk.Label(perf_info, text="Max Workers Batch:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        ttk.Label(perf_info, text="Max Batch Workers:").grid(row=0, column=0, sticky=tk.W, pady=5)
         batch_workers_var = tk.StringVar(value=str(self.batch_operations.max_workers))
         ttk.Entry(perf_info, textvariable=batch_workers_var, width=10).grid(row=0, column=1, padx=10)
         
         def apply_performance():
             try:
                 self.batch_operations.max_workers = int(batch_workers_var.get())
-                messagebox.showinfo("OK", "Impostazioni performance applicate")
+                messagebox.showinfo("OK", "Performance settings applied")
             except:
-                messagebox.showerror("Errore", "Valore non valido")
+                messagebox.showerror("Error", "Invalid value")
                 
-        ttk.Button(perf_frame, text="Applica", command=apply_performance).pack(pady=10)
+        ttk.Button(perf_frame, text="Apply", command=apply_performance).pack(pady=10)
 
-        # Pulsanti
+        # Buttons
         btn_frame = ttk.Frame(settings_window)
         btn_frame.pack(pady=10)
 
         ttk.Button(btn_frame, text="OK", command=settings_window.destroy).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Annulla", command=settings_window.destroy).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=settings_window.destroy).pack(side=tk.LEFT, padx=5)
 
     def show_log_viewer(self):
-        """Visualizza log file"""
+        """View log file"""
         log_window = tk.Toplevel(self.root)
         log_window.title("Log Viewer")
         log_window.geometry("800x600")
         log_window.transient(self.root)
 
-        # Text widget con scrollbar
+        # Text widget with scrollbar
         frame = ttk.Frame(log_window)
         frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
@@ -4098,7 +4097,7 @@ CPU Usage: {summary['cpu_percent']}%
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
 
-        # Carica ultimo log
+        # Load latest log
         try:
             log_file = os.path.join("logs", f"snmp_browser_{datetime.now().strftime('%Y%m%d')}.log")
             if os.path.exists(log_file):
@@ -4106,13 +4105,13 @@ CPU Usage: {summary['cpu_percent']}%
                     text.insert(tk.END, f.read())
                 text.see(tk.END)
             else:
-                text.insert(tk.END, "Nessun file log trovato per oggi.")
+                text.insert(tk.END, "No log file found for today.")
         except Exception as e:
-            text.insert(tk.END, f"Errore caricamento log: {str(e)}")
+            text.insert(tk.END, f"Error loading log: {str(e)}")
 
         text.config(state=tk.DISABLED)
 
-        # Pulsanti
+        # Buttons
         btn_frame = ttk.Frame(log_window)
         btn_frame.pack(pady=5)
 
@@ -4127,23 +4126,23 @@ CPU Usage: {summary['cpu_percent']}%
                 pass
             text.config(state=tk.DISABLED)
 
-        ttk.Button(btn_frame, text="Aggiorna", command=refresh_log).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Chiudi", command=log_window.destroy).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Refresh", command=refresh_log).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Close", command=log_window.destroy).pack(side=tk.LEFT, padx=5)
 
     def show_debug_info(self):
-        """Mostra informazioni debug"""
+        """Show debug information"""
         info = f"""
 DEBUG INFO
 
-Sistema: {sys.platform}
+System: {sys.platform}
 Python: {sys.version}
-Memoria: {psutil.Process().memory_info().rss / 1024 / 1024:.1f}MB
+Memory: {psutil.Process().memory_info().rss / 1024 / 1024:.1f}MB
 CPU: {psutil.cpu_percent()}%
 
-Risultati caricati: {len(self.scan_results)}
-Dashboard elementi: {len(self.saved_values)}
-Trap ricevuti: {len(self.received_traps)}
-Profili salvati: {len(self.profile_manager.list_profiles())}
+Results loaded: {len(self.scan_results)}
+Dashboard items: {len(self.saved_values)}
+Traps received: {len(self.received_traps)}
+Saved profiles: {len(self.profile_manager.list_profiles())}
 
 Performance Summary:
 {json.dumps(self.performance_monitor.get_summary(), indent=2)}
@@ -4151,70 +4150,70 @@ Performance Summary:
 Log directory: {os.path.abspath('logs')}
 Config file: {os.path.abspath(self.config_file)}
 
-SNMP Client attivo: {'Si' if self.client else 'No'}
-Versione SNMP: {self.version_var.get()}
-Trap Receiver: {'Attivo' if self.trap_receiver and self.trap_receiver.running else 'Inattivo'}
+SNMP Client active: {'Yes' if self.client else 'No'}
+SNMP Version: {self.version_var.get()}
+Trap Receiver: {'Active' if self.trap_receiver and self.trap_receiver.running else 'Inactive'}
 """
 
         messagebox.showinfo("Debug Info", info)
 
     def show_shortcuts(self):
-        """Mostra shortcuts tastiera"""
+        """Show keyboard shortcuts"""
         shortcuts = """
-SHORTCUTS TASTIERA
+KEYBOARD SHORTCUTS
 
-Ctrl+S    - Salva configurazione
-Ctrl+O    - Carica configurazione  
-Ctrl+E    - Esporta risultati
-Ctrl+T    - Test connessione
-Ctrl+Q    - Esci
+Ctrl+S    - Save configuration
+Ctrl+O    - Load configuration  
+Ctrl+E    - Export results
+Ctrl+T    - Test connection
+Ctrl+Q    - Exit
 
-F1        - Guida
-F5        - Aggiorna dashboard
-ESC       - Interrompi scansione
+F1        - Help
+F5        - Refresh dashboard
+ESC       - Stop scan
 
-Doppio Click - GET su OID
-Click Destro - Menu contestuale
+Double Click - GET on OID
+Right Click  - Context menu
 """
         messagebox.showinfo("Shortcuts", shortcuts)
 
     def on_closing(self):
-        """Chiusura applicazione con cleanup"""
+        """Application closing with cleanup"""
         if self.scanning:
-            if not messagebox.askyesno("Scansione in corso",
-                                       "Scansione in corso. Vuoi davvero uscire?"):
+            if not messagebox.askyesno("Scan in progress",
+                                       "Scan in progress. Do you really want to exit?"):
                 return
             self.stop_scan()
 
-        # Ferma trap receiver
+        # Stop trap receiver
         if self.trap_receiver and self.trap_receiver.running:
             self.trap_receiver.stop()
 
-        # Ferma timer
+        # Stop timer
         if self.auto_refresh_timer:
             self.root.after_cancel(self.auto_refresh_timer)
 
-        # Salva configurazione
+        # Save configuration
         self.save_config()
         self.save_saved_values()
 
-        # Cancella password dalla memoria
+        # Clear passwords from memory
         self.credential_manager.secure_delete(self.v3_auth_password_var.get())
         self.credential_manager.secure_delete(self.v3_priv_password_var.get())
 
         # Cleanup
         gc.collect()
 
-        self.logger.info("Chiusura applicazione")
+        self.logger.info("Application closing")
         self.logger.info("=" * 60)
 
         self.root.quit()
         self.root.destroy()
 
-    # Metodi helper esistenti dal codice originale
+    # Existing helper methods from original code
 
     def apply_filter(self, *args):
-        """Applica filtri ai risultati"""
+        """Apply filters to results"""
         filter_text = self.filter_var.get().lower()
         show_errors = self.show_errors_var.get()
 
@@ -4234,12 +4233,12 @@ Click Destro - Menu contestuale
                 self.results_tree.detach(item)
 
     def clear_filter(self):
-        """Pulisce filtri"""
+        """Clear filters"""
         self.filter_var.set("")
         self.show_errors_var.set(False)
 
     def on_result_double_click(self, event):
-        """Doppio click su risultato"""
+        """Double click on result"""
         selection = self.results_tree.selection()
         if selection:
             item = selection[0]
@@ -4248,20 +4247,20 @@ Click Destro - Menu contestuale
                 self.get_single_oid(values[0])
 
     def on_mib_double_click(self, event):
-        """Doppio click su MIB tree - Mostra dettagli completi"""
+        """Double click on MIB tree - Show complete details"""
         selection = self.mib_tree.selection()
         if selection:
             item = selection[0]
             values = self.mib_tree.item(item)['values']
-            if values and values[0]:  # Se ha un OID
+            if values and values[0]:  # If it has an OID
                 oid = values[0]
                 value = values[1] if len(values) > 1 else ""
                 type_str = values[2] if len(values) > 2 else ""
                 status = values[3] if len(values) > 3 else ""
                 
-                # Se c'è un valore, mostra dettagli
+                # If there's a value, show details
                 if value:
-                    # Recupera valore completo se troncato
+                    # Retrieve full value if truncated
                     if oid in self.scan_results:
                         data = self.scan_results[oid]
                         raw_value = data.get('value')
@@ -4278,23 +4277,23 @@ Click Destro - Menu contestuale
                     else:
                         full_value = value
                     
-                    # Mostra dialog con valore completo
+                    # Show dialog with full value
                     detail_window = tk.Toplevel(self.root)
-                    detail_window.title("Dettagli OID")
+                    detail_window.title("OID Details")
                     detail_window.geometry("600x400")
                     detail_window.transient(self.root)
                     
-                    # Frame info
-                    info_frame = ttk.LabelFrame(detail_window, text="Informazioni OID")
+                    # Info frame
+                    info_frame = ttk.LabelFrame(detail_window, text="OID Information")
                     info_frame.pack(fill=tk.X, padx=10, pady=10)
                     
                     ttk.Label(info_frame, text=f"OID: {oid}").pack(anchor=tk.W, padx=5, pady=2)
-                    ttk.Label(info_frame, text=f"Nome: {self._get_oid_description(oid)}").pack(anchor=tk.W, padx=5, pady=2)
-                    ttk.Label(info_frame, text=f"Tipo: {type_str}").pack(anchor=tk.W, padx=5, pady=2)
-                    ttk.Label(info_frame, text=f"Stato: {status}").pack(anchor=tk.W, padx=5, pady=2)
+                    ttk.Label(info_frame, text=f"Name: {self._get_oid_description(oid)}").pack(anchor=tk.W, padx=5, pady=2)
+                    ttk.Label(info_frame, text=f"Type: {type_str}").pack(anchor=tk.W, padx=5, pady=2)
+                    ttk.Label(info_frame, text=f"Status: {status}").pack(anchor=tk.W, padx=5, pady=2)
                     
-                    # Frame valore
-                    value_frame = ttk.LabelFrame(detail_window, text="Valore")
+                    # Value frame
+                    value_frame = ttk.LabelFrame(detail_window, text="Value")
                     value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
                     
                     text_widget = tk.Text(value_frame, wrap=tk.WORD)
@@ -4302,24 +4301,24 @@ Click Destro - Menu contestuale
                     text_widget.insert(tk.END, full_value)
                     text_widget.config(state=tk.DISABLED)
                     
-                    # Pulsanti
+                    # Buttons
                     btn_frame = ttk.Frame(detail_window)
                     btn_frame.pack(pady=5)
                     
                     def copy_value():
                         self.root.clipboard_clear()
                         self.root.clipboard_append(full_value)
-                        messagebox.showinfo("Copiato", "Valore copiato negli appunti!")
+                        messagebox.showinfo("Copied", "Value copied to clipboard!")
                     
-                    ttk.Button(btn_frame, text="Copia Valore", command=copy_value).pack(side=tk.LEFT, padx=5)
+                    ttk.Button(btn_frame, text="Copy Value", command=copy_value).pack(side=tk.LEFT, padx=5)
                     ttk.Button(btn_frame, text="GET", command=lambda: self.get_single_oid(oid)).pack(side=tk.LEFT, padx=5)
                     ttk.Button(btn_frame, text="OK", command=detail_window.destroy).pack(side=tk.LEFT, padx=5)
                 else:
-                    # Se non c'è valore, prova a fare GET
+                    # If no value, try to GET
                     self.get_single_oid(oid)
 
     def show_context_menu(self, event):
-        """Menu contestuale"""
+        """Context menu"""
         selection = self.results_tree.selection()
         if not selection:
             return
@@ -4329,8 +4328,8 @@ Click Destro - Menu contestuale
         menu.add_command(label="SET", command=self.set_value)
         menu.add_command(label="WALK", command=self.walk_from_selected)
         menu.add_separator()
-        menu.add_command(label="Aggiungi Dashboard", command=self.add_to_dashboard)
-        menu.add_command(label="Copia OID", command=self.copy_oid)
+        menu.add_command(label="Add to Dashboard", command=self.add_to_dashboard)
+        menu.add_command(label="Copy OID", command=self.copy_oid)
 
         try:
             menu.tk_popup(event.x_root, event.y_root)
@@ -4338,7 +4337,7 @@ Click Destro - Menu contestuale
             menu.grab_release()
 
     def add_to_dashboard(self):
-        """Aggiunge a dashboard con supporto v3"""
+        """Add to dashboard with v3 support"""
         selection = self.results_tree.selection()
         if not selection:
             return
@@ -4358,7 +4357,7 @@ Click Destro - Menu contestuale
                     'port': self.port_var.get()
                 }
 
-                # Se v3, salva configurazione criptata
+                # If v3, save encrypted configuration
                 if self.version_var.get() == "3":
                     config['v3_config'] = {
                         'username': self.v3_user_var.get(),
@@ -4374,11 +4373,11 @@ Click Destro - Menu contestuale
                 count += 1
 
         self.save_saved_values()
-        self.logger.info(f"Aggiunti {count} elementi al dashboard")
-        messagebox.showinfo("Dashboard", f"Aggiunti {count} elementi al dashboard")
+        self.logger.info(f"Added {count} items to dashboard")
+        messagebox.showinfo("Dashboard", f"Added {count} items to dashboard")
 
     def copy_oid(self):
-        """Copia OID negli appunti"""
+        """Copy OID to clipboard"""
         selection = self.results_tree.selection()
         if selection:
             item = selection[0]
@@ -4386,13 +4385,13 @@ Click Destro - Menu contestuale
             if values:
                 self.root.clipboard_clear()
                 self.root.clipboard_append(values[0])
-                self.status_var.set(f"OID copiato: {values[0]}")
+                self.status_var.set(f"OID copied: {values[0]}")
 
     def remove_from_dashboard(self):
-        """Rimuove da dashboard"""
+        """Remove from dashboard"""
         selection = self.dashboard_tree.selection()
         if not selection:
-            messagebox.showwarning("Avviso", "Seleziona elementi da rimuovere")
+            messagebox.showwarning("Warning", "Select items to remove")
             return
 
         for item in selection:
@@ -4406,50 +4405,50 @@ Click Destro - Menu contestuale
         self.save_saved_values()
 
     def clear_dashboard(self):
-        """Pulisce dashboard"""
-        if self.saved_values and messagebox.askyesno("Conferma", "Rimuovere tutti gli elementi?"):
+        """Clear dashboard"""
+        if self.saved_values and messagebox.askyesno("Confirm", "Remove all items?"):
             self.saved_values.clear()
             for item in self.dashboard_tree.get_children():
                 self.dashboard_tree.delete(item)
             self.save_saved_values()
 
     def toggle_auto_refresh(self):
-        """Toggle auto-refresh dashboard"""
+        """Toggle dashboard auto-refresh"""
         if self.auto_refresh_var.get():
             self.refresh_dashboard()
             self.auto_refresh_timer = self.root.after(30000, self.toggle_auto_refresh)
-            self.logger.info("Auto-refresh dashboard attivato")
+            self.logger.info("Dashboard auto-refresh enabled")
         else:
             if self.auto_refresh_timer:
                 self.root.after_cancel(self.auto_refresh_timer)
                 self.auto_refresh_timer = None
-            self.logger.info("Auto-refresh dashboard disattivato")
+            self.logger.info("Dashboard auto-refresh disabled")
 
     def build_mib_tree(self):
-        """Costruisce albero MIB con nomi descrittivi"""
+        """Build MIB tree with descriptive names"""
         if not self.scan_results:
-            messagebox.showwarning("Avviso", "Effettua prima una scansione")
+            messagebox.showwarning("Warning", "Perform a scan first")
             return
 
-        # Pulisce albero esistente
+        # Clear existing tree
         for item in self.mib_tree.get_children():
             self.mib_tree.delete(item)
 
-        self.status_var.set("Costruzione albero MIB...")
+        self.status_var.set("Building MIB tree...")
         self.progress.start()
         
-        # Struttura per organizzare OID gerarchicamente
+        # Structure to organize OIDs hierarchically
         tree_structure = {}
         
-        # Processa ogni OID dai risultati
+        # Process each OID from results
         for oid, data in self.scan_results.items():
             parts = oid.split('.')
             current = tree_structure
             
-            # Costruisce path completo
+            # Build full path
             path = []
             for i, part in enumerate(parts):
-                if part:  # Ignora parti vuote
+                if part:  # Ignore empty parts
                     path.append(part)
                     full_oid = '.'.join(path)
                     
@@ -4461,26 +4460,26 @@ Click Destro - Menu contestuale
                             '_children': {}
                         }
                     
-                    # Se questo è l'OID completo, salva i dati
+                    # If this is the complete OID, save the data
                     if full_oid == oid:
                         current[part]['_data'] = data
                         
                     current = current[part]['_children']
         
-        # Popola l'albero
+        # Populate the tree
         self._populate_mib_tree_enhanced("", tree_structure)
         
         self.progress.stop()
-        self.status_var.set("Albero MIB costruito")
+        self.status_var.set("MIB tree built")
         
-        # Espandi i primi livelli
+        # Expand first levels
         for item in self.mib_tree.get_children():
             self.mib_tree.item(item, open=True)
             for child in self.mib_tree.get_children(item):
                 self.mib_tree.item(child, open=True)
 
     def _populate_mib_tree_enhanced(self, parent, tree_dict):
-        """Popola albero MIB con valori visibili direttamente"""
+        """Populate MIB tree with values visible directly"""
         for key, value in sorted(tree_dict.items(), key=lambda x: (x[0].isdigit(), int(x[0]) if x[0].isdigit() else x[0])):
             if isinstance(value, dict):
                 oid = value.get('_oid', key)
@@ -4488,26 +4487,26 @@ Click Destro - Menu contestuale
                 data = value.get('_data', None)
                 children = value.get('_children', {})
                 
-                # Determina il testo da mostrare
+                # Determine text to show
                 if name:
                     display_text = f"{key} - {name}"
                 else:
                     display_text = key
                 
-                # Prepara il valore da mostrare
+                # Prepare value to show
                 value_str = ""
                 type_str = ""
                 status_str = ""
                 
                 if data:
-                    # Se abbiamo dati per questo OID
+                    # If we have data for this OID
                     raw_value = data.get('value')
                     
-                    # Formatta il valore per la visualizzazione
+                    # Format value for display
                     if isinstance(raw_value, SnmpOctetString):
                         try:
                             value_str = raw_value.value.decode('utf-8', errors='replace')
-                            # Tronca se troppo lungo
+                            # Truncate if too long
                             if len(value_str) > 100:
                                 value_str = value_str[:100] + "..."
                         except:
@@ -4526,51 +4525,51 @@ Click Destro - Menu contestuale
                     type_str = data.get('type', '')
                     status_str = data.get('status', 'OK')
                     
-                    # Tag per nodi con dati (colore diverso se vogliamo)
+                    # Tag for nodes with data (different color if we want)
                     tag = 'hasdata'
                 else:
-                    # Nodi senza dati
+                    # Nodes without data
                     tag = 'nodata'
                 
-                # Inserisce il nodo con tutte le informazioni incluso il valore
+                # Insert node with all info including value
                 node = self.mib_tree.insert(parent, tk.END, 
                                         text=display_text,
                                         values=(oid, value_str, type_str, status_str),
                                         tags=(tag,))
                 
-                # Configurazione colori (nero per tutto)
+                # Color configuration (black for all)
                 self.mib_tree.tag_configure('hasdata', foreground='black', font=('TkDefaultFont', 9, 'normal'))
                 self.mib_tree.tag_configure('nodata', foreground='black', font=('TkDefaultFont', 9, 'normal'))
                 
-                # Processa ricorsivamente i figli
+                # Recursively process children
                 if children:
                     self._populate_mib_tree_enhanced(node, children)
 
     def expand_all_mib(self):
-        """Espande tutto l'albero MIB"""
+        """Expand all MIB tree"""
         for item in self.mib_tree.get_children():
             self._expand_tree_recursive(item)
 
     def collapse_all_mib(self):
-        """Comprimi tutto l'albero MIB"""
+        """Collapse all MIB tree"""
         for item in self.mib_tree.get_children():
             self._collapse_tree_recursive(item)
 
     def _expand_tree_recursive(self, item):
-        """Espande ricorsivamente"""
+        """Expand recursively"""
         self.mib_tree.item(item, open=True)
         for child in self.mib_tree.get_children(item):
             self._expand_tree_recursive(child)
 
     def _collapse_tree_recursive(self, item):
-        """Comprimi ricorsivamente"""
+        """Collapse recursively"""
         self.mib_tree.item(item, open=False)
         for child in self.mib_tree.get_children(item):
             self._collapse_tree_recursive(child)
 
     def clear_cache(self):
-        """Pulisce cache e risultati"""
-        if messagebox.askyesno("Pulisci Cache", "Pulire tutti i risultati e la cache?"):
+        """Clear cache and results"""
+        if messagebox.askyesno("Clear Cache", "Clear all results and cache?"):
             for item in self.results_tree.get_children():
                 self.results_tree.delete(item)
             for item in self.mib_tree.get_children():
@@ -4581,14 +4580,14 @@ Click Destro - Menu contestuale
 
             gc.collect()
 
-            self.status_var.set("Cache pulita")
+            self.status_var.set("Cache cleared")
             self.info_var.set("")
-            self.logger.info("Cache pulita")
+            self.logger.info("Cache cleared")
 
     def load_config_dialog(self):
-        """Dialog carica configurazione"""
+        """Load configuration dialog"""
         filename = filedialog.askopenfilename(
-            title="Carica Configurazione",
+            title="Load Configuration",
             filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")]
         )
 
@@ -4597,7 +4596,7 @@ Click Destro - Menu contestuale
                 with open(filename, 'r') as f:
                     config = json.load(f)
 
-                # Applica configurazione
+                # Apply configuration
                 self.host_var.set(config.get('host', '192.168.1.1'))
                 self.community_var.set(config.get('community', 'public'))
                 self.port_var.set(config.get('port', '161'))
@@ -4605,61 +4604,61 @@ Click Destro - Menu contestuale
                 self.timeout_var.set(config.get('timeout', '5.0'))
                 self.retries_var.set(config.get('retries', '3'))
 
-                messagebox.showinfo("Configurazione", "Configurazione caricata con successo!")
-                self.logger.info(f"Configurazione caricata da: {filename}")
+                messagebox.showinfo("Configuration", "Configuration loaded successfully!")
+                self.logger.info(f"Configuration loaded from: {filename}")
 
             except Exception as e:
-                messagebox.showerror("Errore", f"Errore caricamento:\n{str(e)}")
-                self.logger.error(f"Errore caricamento config: {str(e)}")
+                messagebox.showerror("Error", f"Loading error:\n{str(e)}")
+                self.logger.error(f"Error loading config: {str(e)}")
 
     def save_saved_values(self):
-        """Salva valori dashboard"""
+        """Save dashboard values"""
         try:
             with open(self.saved_values_file, 'w') as f:
                 json.dump(self.saved_values, f, indent=2)
         except Exception as e:
-            self.logger.error(f"Errore salvataggio dashboard: {e}")
+            self.logger.error(f"Error saving dashboard: {e}")
 
     def load_saved_values(self):
-        """Carica valori dashboard"""
+        """Load dashboard values"""
         try:
             if os.path.exists(self.saved_values_file):
                 with open(self.saved_values_file, 'r') as f:
                     self.saved_values = json.load(f)
-                self.logger.info(f"Dashboard caricato: {len(self.saved_values)} elementi")
+                self.logger.info(f"Dashboard loaded: {len(self.saved_values)} items")
         except Exception as e:
-            self.logger.error(f"Errore caricamento dashboard: {e}")
+            self.logger.error(f"Error loading dashboard: {e}")
 
     def show_snmpv3_wizard(self):
-        """Wizard configurazione SNMPv3"""
+        """SNMPv3 configuration wizard"""
         wizard = tk.Toplevel(self.root)
-        wizard.title("Wizard SNMPv3")
+        wizard.title("SNMPv3 Wizard")
         wizard.geometry("500x400")
         wizard.transient(self.root)
 
         text = """
-CONFIGURAZIONE SNMPv3
+SNMPv3 CONFIGURATION
 
-1. USERNAME: Identifica l'utente SNMPv3
+1. USERNAME: Identifies the SNMPv3 user
 
-2. AUTENTICAZIONE:
-   • noAuth: Nessuna autenticazione
-   • MD5/SHA: Richiede password (min 8 caratteri)
+2. AUTHENTICATION:
+   • noAuth: No authentication
+   • MD5/SHA: Requires password (min 8 characters)
 
-3. PRIVACY (Crittografia):
-   • noPriv: Nessuna crittografia
-   • DES/AES: Richiede password privacy
+3. PRIVACY (Encryption):
+   • noPriv: No encryption
+   • DES/AES: Requires privacy password
 
-4. LIVELLI SICUREZZA:
-   • noAuthNoPriv: Solo username
-   • authNoPriv: Username + autenticazione
-   • authPriv: Username + auth + crittografia
+4. SECURITY LEVELS:
+   • noAuthNoPriv: Username only
+   • authNoPriv: Username + authentication
+   • authPriv: Username + auth + encryption
 
-5. ENGINE ID: Identifica univocamente il dispositivo
-   (usa "Scopri Engine ID" per ottenerlo)
+5. ENGINE ID: Uniquely identifies the device
+   (use "Discover Engine ID" to get it)
 
-Le password devono corrispondere a quelle
-configurate sul dispositivo SNMP!
+Passwords must match those configured
+on the SNMP device!
 """
 
         text_widget = tk.Text(wizard, wrap=tk.WORD)
@@ -4670,50 +4669,50 @@ configurate sul dispositivo SNMP!
         ttk.Button(wizard, text="OK", command=wizard.destroy).pack(pady=10)
 
     def show_help(self):
-        """Mostra guida"""
+        """Show help"""
         help_text = """
-GUIDA SNMP BROWSER
+SNMP BROWSER HELP
 
-OPERAZIONI BASE:
-• Configura host e parametri
-• Scegli versione SNMP (1, 2c, 3)
-• Clicca "Avvia Scansione"
-• Visualizza risultati nel browser
+BASIC OPERATIONS:
+• Configure host and parameters
+• Choose SNMP version (1, 2c, 3)
+• Click "Start Scan"
+• View results in browser
 
-SNMPV3:
-• Richiede username e password
-• Supporta autenticazione e crittografia
-• Usa "Scopri Engine ID" per discovery
+SNMPv3:
+• Requires username and password
+• Supports authentication and encryption
+• Use "Discover Engine ID" for discovery
 
-FUNZIONI AVANZATE:
-• GET: Doppio click su OID
-• SET: Click destro > SET
-• WALK: Click destro > WALK
-• Dashboard: Monitora valori specifici
-• Export: Salva in vari formati
+ADVANCED FEATURES:
+• GET: Double click on OID
+• SET: Right click > SET
+• WALK: Right click > WALK
+• Dashboard: Monitor specific values
+• Export: Save in various formats
 
-NUOVE FUNZIONALITÀ:
-• Trap Receiver: Ricevi trap SNMP
-• Performance Monitor: Traccia metriche
+NEW FEATURES:
+• Trap Receiver: Receive SNMP traps
+• Performance Monitor: Track metrics
 • Batch Operations: Query multiple hosts
-• MIB Loading: Carica file MIB custom
-• Profile Manager: Salva configurazioni
+• MIB Loading: Load custom MIB files
+• Profile Manager: Save configurations
 
-LIMITI SICUREZZA:
-• Max 10000 risultati per scansione
-• Max 500MB memoria
-• Timeout 5 minuti per scansione
-• Password criptate in configurazione
+SECURITY LIMITS:
+• Max 10000 results per scan
+• Max 500MB memory
+• 5 minutes timeout per scan
+• Encrypted passwords in configuration
 
 SHORTCUTS:
-• F5: Aggiorna dashboard
-• Ctrl+T: Test connessione
-• Ctrl+S: Salva configurazione
-• ESC: Interrompi scansione
+• F5: Refresh dashboard
+• Ctrl+T: Test connection
+• Ctrl+S: Save configuration
+• ESC: Stop scan
 """
 
         help_window = tk.Toplevel(self.root)
-        help_window.title("Guida")
+        help_window.title("Help")
         help_window.geometry("600x500")
         help_window.transient(self.root)
 
@@ -4725,21 +4724,21 @@ SHORTCUTS:
         ttk.Button(help_window, text="OK", command=help_window.destroy).pack(pady=10)
 
     def show_about(self):
-        """Mostra info applicazione con logo"""
-        # Crea finestra personalizzata
+        """Show about window with logo"""
+        # Create custom window
         about_window = tk.Toplevel(self.root)
-        about_window.title("Informazioni su SNMP Browser")
+        about_window.title("About SNMP Browser")
         about_window.geometry("450x490")
         about_window.resizable(False, False)
         about_window.transient(self.root)
         
-        # Centra la finestra
+        # Center window
         about_window.update_idletasks()
         x = (about_window.winfo_screenwidth() // 2) - (450 // 2)
         y = (about_window.winfo_screenheight() // 2) - (480 // 2)
         about_window.geometry(f'+{x}+{y}')
         
-        # Frame principale
+        # Main frame
         main_frame = ttk.Frame(about_window)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
@@ -4750,67 +4749,65 @@ SHORTCUTS:
             logo_label.image = logo
             logo_label.pack(pady=(5, 10))
         except Exception as e:
-            self.logger.error(f"Errore caricamento logo: {e}")
+            self.logger.error(f"Unable to load icon: {e}")
             logo_label = ttk.Label(main_frame, text="SNMP Browser", font=('Arial', 48))
             logo_label.pack(pady=(5, 10))
         
-        # Titolo
+        # Title
         title_frame = ttk.Frame(main_frame)
         title_frame.pack()
         
         ttk.Label(title_frame, text="SNMP Browser",
                 font=('TkDefaultFont', 16, 'bold')).pack()
-        ttk.Label(title_frame, text="Production Ready",
-                font=('TkDefaultFont', 10, 'italic')).pack()
         
-        # Separatore
+        # Separator
         ttk.Separator(main_frame, orient='horizontal').pack(fill='x', pady=10)
         
-        # Features in due colonne
-        features_frame = ttk.LabelFrame(main_frame, text="✨ Caratteristiche")
+        # Features in two columns
+        features_frame = ttk.LabelFrame(main_frame, text="✨ Features")
         features_frame.pack(fill='x', pady=5)
         
         features_content = ttk.Frame(features_frame)
         features_content.pack(padx=10, pady=8)
         
-        # Prima colonna
+        # First column
         col1_features = [
-            "Supporto SNMPv1/v2c/v3",
-            "Crittografia AES",
-            "Logging con rotazione",
-            "Memoria ottimizzata"
+            "SNMPv1/v2c/v3 Support",
+            "AES Encryption",
+            "Rotating Logging",
+            "Optimized Memory"
         ]
         
-        # Seconda colonna  
+        # Second column  
         col2_features = [
-            "Export multi-formato",
-            "Dashboard real-time",
-            "MIB Browser integrato",
-            "Scansione bulk"
+            "Multi-format Export",
+            "Real-time Dashboard",
+            "Integrated MIB Browser",
+            "Bulk Scanning"
         ]
         
-        # Grid a due colonne
+        # Two column grid
         for i, (feat1, feat2) in enumerate(zip(col1_features, col2_features)):
             ttk.Label(features_content, text=feat1, font=('TkDefaultFont', 8)).grid(
                 row=i, column=0, sticky='w', padx=(0, 20))
             ttk.Label(features_content, text=feat2, font=('TkDefaultFont', 8)).grid(
                 row=i, column=1, sticky='w')
         
-        # Info sistema compatte
-        info_frame = ttk.LabelFrame(main_frame, text="Sistema")
+        # Compact system info
+        info_frame = ttk.LabelFrame(main_frame, text="System")
         info_frame.pack(fill='x', pady=5)
         
         info_content = ttk.Frame(info_frame)
         info_content.pack(padx=10, pady=8)
         
-        # Info in grid compatta
+        # Compact grid info
         memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
         cpu_percent = psutil.Process().cpu_percent()
         
         info_data = [
             ("OS:", sys.platform.title(), "Python:", sys.version.split()[0]),
-            ("Memoria:", f"{memory_mb:.1f} MB", "CPU:", f"{cpu_percent:.1f}%"),
-            ("Risultati:", str(len(self.scan_results)), "Thread:", str(threading.active_count()))
+            ("Memory:", f"{memory_mb:.1f} MB", "CPU:", f"{cpu_percent:.1f}%"),
+            ("Results:", str(len(self.scan_results)), "Threads:", str(threading.active_count()))
         ]
         
         for i, (label1, value1, label2, value2) in enumerate(info_data):
@@ -4823,60 +4820,60 @@ SHORTCUTS:
             ttk.Label(info_content, text=value2, font=('TkDefaultFont', 8)).grid(
                 row=i, column=3, sticky='w')
         
-        # Separatore
+        # Separator
         ttk.Separator(main_frame, orient='horizontal').pack(fill='x', pady=8)
         
-        # Copyright e crediti
+        # Copyright and credits
         credits_frame = ttk.Frame(main_frame)
         credits_frame.pack()
         
         ttk.Label(credits_frame, text="© 2024 - Powered by JustVugg",
                 font=('TkDefaultFont', 9)).pack()
         
-        # Link a SNMPY
-        snmpy_label = ttk.Label(credits_frame, text="Basato su libreria SNMPY", 
+        # Link to SNMPY
+        snmpy_label = ttk.Label(credits_frame, text="Based on SNMPY library", 
                             foreground='blue', cursor='hand2',
                             font=('TkDefaultFont', 9, 'underline'))
         snmpy_label.pack(pady=3)
         snmpy_label.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/JustVugg/snmpy"))
         
-        # Pulsanti
+        # Buttons
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(pady=(8, 5))
         
         ttk.Button(button_frame, text="OK", 
                 command=about_window.destroy, width=10).pack()
         
-        # Focus e bind
+        # Focus and bind
         about_window.focus_set()
         about_window.bind('<Escape>', lambda e: about_window.destroy())
         about_window.bind('<Return>', lambda e: about_window.destroy())
 
     def get_about_logo(self):
-        """Carica il logo da icon.png usando PIL"""
+        """Load logo from icon.png using PIL"""
         from PIL import Image, ImageTk
         
         try:
-            # Percorso del file icon.png
+            # Icon.png file path
             icon_path = os.path.join(os.path.dirname(__file__), 'icon.png')
             
             if os.path.exists(icon_path):
-                # Usa PIL per caricare e ridimensionare l'immagine
+                # Use PIL to load and resize image
                 image = Image.open(icon_path)
-                # Ridimensiona a 100x100 pixel
+                # Resize to 100x100 pixels
                 image = image.resize((100, 100), Image.Resampling.LANCZOS)
-                # Converti in PhotoImage per Tkinter
+                # Convert to PhotoImage for Tkinter
                 return ImageTk.PhotoImage(image)
             else:
-                raise FileNotFoundError(f"File non trovato: {icon_path}")
+                raise FileNotFoundError(f"File not found: {icon_path}")
                 
         except Exception as e:
-            self.logger.error(f"Impossibile caricare icona: {e}")
-            raise  # Importante: solleva l'eccezione per attivare il fallback
+            self.logger.error(f"Unable to load icon: {e}")
+            raise  # Important: raise exception to trigger fallback
 
 
 def check_dependencies():
-    """Verifica dipendenze necessarie"""
+    """Check required dependencies"""
     missing = []
 
     try:
@@ -4890,17 +4887,17 @@ def check_dependencies():
         missing.append("cryptography")
 
     if missing:
-        print("Dipendenze mancanti:")
-        print(f"   Installa con: pip install {' '.join(missing)}")
+        print("Missing dependencies:")
+        print(f"   Install with: pip install {' '.join(missing)}")
         return False
 
-    # Check opzionali
+    # Check optional
     try:
         import matplotlib
-        print("✓ Matplotlib trovato - Grafici performance abilitati")
+        print("✓ Matplotlib found - Performance graphs enabled")
     except ImportError:
-        print("⚠ Matplotlib non trovato - Grafici performance disabilitati")
-        print("  Installa con: pip install matplotlib")
+        print("⚠ Matplotlib not found - Performance graphs disabled")
+        print("  Install with: pip install matplotlib")
 
     return True
 
@@ -4908,35 +4905,35 @@ def check_dependencies():
 def main():
     """Main function production ready"""
     try:
-        # Verifica dipendenze
+        # Check dependencies
         if not check_dependencies():
             sys.exit(1)
 
-        # Crea directory necessarie
+        # Create necessary directories
         os.makedirs("logs", exist_ok=True)
 
-        # Crea finestra principale
+        # Create main window
         root = tk.Tk()
 
-        # Icona (se disponibile)
+        # Icon (if available)
         try:
-            # Per Windows e Linux
+            # For Windows and Linux
             icon_path = os.path.join(os.path.dirname(__file__), 'icon.png')
             if os.path.exists(icon_path):
                 icon = tk.PhotoImage(file=icon_path)
                 root.iconphoto(True, icon)
             else:
-                # Prova con .ico per Windows
+                # Try with .ico for Windows
                 ico_path = os.path.join(os.path.dirname(__file__), 'icon.ico')
                 if os.path.exists(ico_path) and sys.platform.startswith('win'):
                     root.iconbitmap(ico_path)
         except Exception as e:
-            print(f"Impossibile caricare icona: {e}")
+            print(f"Unable to load icon: {e}")
 
-        # Crea applicazione
+        # Create application
         app = SnmpBrowserGUI(root)
 
-        # Bind shortcuts globali
+        # Bind global shortcuts
         root.bind('<F1>', lambda e: app.show_help())
         root.bind('<F5>', lambda e: app.refresh_dashboard())
         root.bind('<Control-s>', lambda e: app.save_config())
@@ -4946,7 +4943,7 @@ def main():
         root.bind('<Control-q>', lambda e: app.on_closing())
         root.bind('<Escape>', lambda e: app.stop_scan() if app.scanning else None)
 
-        # Centra finestra
+        # Center window
         root.update_idletasks()
         width = root.winfo_width()
         height = root.winfo_height()
@@ -4954,24 +4951,23 @@ def main():
         y = (root.winfo_screenheight() // 2) - (height // 2)
         root.geometry(f'{width}x{height}+{x}+{y}')
 
-        # Avvia GUI
+        # Start GUI
         root.mainloop()
 
     except Exception as e:
-        print(f"Errore critico: {e}")
+        print(f"Critical error: {e}")
         traceback.print_exc()
 
         try:
-            messagebox.showerror("Errore Critico",
-                                 f"Impossibile avviare l'applicazione:\n\n{str(e)}")
+            messagebox.showerror("Critical Error",
+                                 f"Unable to start application:\n\n{str(e)}")
         except:
             pass
 
         sys.exit(1)
 
 
-
-
-
 if __name__ == "__main__":
     main()
+
+        
