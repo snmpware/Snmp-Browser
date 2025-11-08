@@ -66,13 +66,21 @@ Download the latest pre-built executable from the [Releases](https://github.com/
 
 ### 📦 SNMP Library Dependency
 
-> **Required Library: [snmpy](https://github.com/JustVugg/snmpy) by [JustVugg](https://github.com/JustVugg)**  
+> **Required Library: [snmpy](https://github.com/snmpware/snmpy)**
 >
-> This SNMP library is **required to run SNMP Browser Professional**.  
+> This SNMP library is **required to run SNMP Browser Professional**.
 > It is not available on PyPI and must be installed directly from GitHub:
 
+**Option 1: Using pip**
 ```bash
-pip install git+https://github.com/JustVugg/snmpy.git
+pip install git+https://github.com/snmpware/snmpy.git
+```
+
+**Option 2: Manual installation**
+```bash
+git clone https://github.com/snmpware/snmpy.git
+cd snmpy
+python3 setup.py install
 ```
 
 ### Prerequisites
@@ -83,7 +91,9 @@ pip install -r requirements.txt
 **Required packages:**
 - `cryptography>=41.0.0` - Encryption support for SNMPv3 and credential storage
 - `psutil>=5.9.0` - System monitoring and resource management
-- `snmpy>=2.1.0` - Advanced SNMP library with trap support
+- `pysnmp==4.4.12` - SNMP protocol implementation (v4 for compatibility)
+- `pyasn1>=0.4.8` - ASN.1 types and codecs (required by pysnmp)
+- `snmpy` - Advanced SNMP library with trap support (from GitHub)
 - `Pillow>=10.0.0` - Image processing for logo display
 - `matplotlib>=3.5.0` - Performance graphs (optional but recommended)
 
@@ -266,7 +276,9 @@ cryptography>=41.0.0
 psutil>=5.9.0
 Pillow>=10.0.0
 matplotlib>=3.5.0
-git+https://github.com/JustVugg/snmpy.git@v2.1.0
+pysnmp==4.4.12
+pyasn1>=0.4.8
+git+https://github.com/snmpware/snmpy.git
 ```
 
 ### Development Requirements
@@ -312,7 +324,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## 🙏 Acknowledgments
 
-- **SNMP Library**: [snmpy](https://github.com/JustVugg/snmpy) by [JustVugg](https://github.com/JustVugg)
+- **SNMP Library**: [snmpy](https://github.com/snmpware/snmpy) by [snmpware](https://github.com/snmpware)
 - **GUI Framework**: [tkinter](https://docs.python.org/3/library/tkinter.html)
 - **Icons**: Material Design Icons
 - **Executable Packaging**: [PyInstaller](https://pyinstaller.readthedocs.io/)
