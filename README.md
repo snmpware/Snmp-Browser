@@ -18,6 +18,7 @@ Advanced SNMP browser with modern GUI for network device discovery, monitoring, 
 ### Core Capabilities
 - **SNMPv1/v2c/v3 Support** - Complete SNMP protocol support with authentication and encryption
 - **Modern GUI Interface** - Professional tabbed interface built with tkinter
+- **Multi-Language Support** - 10 languages including English, Spanish, French, German, Chinese, Japanese, Portuguese, Russian, Arabic, and Hindi
 - **Cross-Platform** - Native support for Windows and Linux systems
 - **Network Device Discovery** - Browse and explore SNMP-enabled devices
 - **Real-time Monitoring** - Live monitoring with auto-refresh capabilities
@@ -168,12 +169,37 @@ pyinstaller --onefile --windowed --icon=icon.png \
 2. View real-time metrics after operations
 3. Export data for analysis
 
+## 🌍 Multi-Language Support
+
+SNMP Browser Professional supports 10 languages out of the box:
+
+- 🇬🇧 English (en)
+- 🇪🇸 Spanish (es) - Español
+- 🇫🇷 French (fr) - Français
+- 🇩🇪 German (de) - Deutsch
+- 🇨🇳 Chinese (zh) - 中文
+- 🇯🇵 Japanese (ja) - 日本語
+- 🇵🇹 Portuguese (pt) - Português
+- 🇷🇺 Russian (ru) - Русский
+- 🇸🇦 Arabic (ar) - العربية
+- 🇮🇳 Hindi (hi) - हिन्दी
+
+### Changing Language
+1. Go to **Help** → **Language**
+2. Select your preferred language
+3. Click **Apply**
+4. Restart the application
+
+### Adding New Languages
+Want to add your language? See the [LANGUAGE_GUIDE.md](LANGUAGE_GUIDE.md) for step-by-step instructions. Contributions are welcome!
+
 ## 🔧 Configuration Files
 
 The application creates several configuration files:
-- `snmp_browser_config.json` - Main configuration
+- `snmp_browser_config.json` - Main configuration (includes language preference)
 - `snmp_browser_saved.json` - Dashboard items
 - `snmp_profiles.json` - Saved connection profiles
+- `languages.json` - Multi-language translations
 - `.SNMPBrowser_key` - Encryption key (keep secure!)
 - `logs/` - Directory containing rotating log files
 
