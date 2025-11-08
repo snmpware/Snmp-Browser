@@ -18,6 +18,7 @@ Advanced SNMP browser with modern GUI for network device discovery, monitoring, 
 ### Core Capabilities
 - **SNMPv1/v2c/v3 Support** - Complete SNMP protocol support with authentication and encryption
 - **Modern GUI Interface** - Professional tabbed interface built with tkinter
+- **Multi-Language Support** - 13 languages including English, Spanish, French, German, Italian, Chinese, Japanese, Portuguese, Russian, Swedish, Arabic, Hindi, and Hungarian
 - **Cross-Platform** - Native support for Windows and Linux systems
 - **Network Device Discovery** - Browse and explore SNMP-enabled devices
 - **Real-time Monitoring** - Live monitoring with auto-refresh capabilities
@@ -65,13 +66,21 @@ Download the latest pre-built executable from the [Releases](https://github.com/
 
 ### 📦 SNMP Library Dependency
 
-> **Required Library: [snmpy](https://github.com/JustVugg/snmpy) by [JustVugg](https://github.com/JustVugg)**  
+> **Required Library: [snmpy](https://github.com/snmpware/snmpy)**
 >
-> This SNMP library is **required to run SNMP Browser Professional**.  
+> This SNMP library is **required to run SNMP Browser Professional**.
 > It is not available on PyPI and must be installed directly from GitHub:
 
+**Option 1: Using pip**
 ```bash
-pip install git+https://github.com/JustVugg/snmpy.git
+pip install git+https://github.com/snmpware/snmpy.git
+```
+
+**Option 2: Manual installation**
+```bash
+git clone https://github.com/snmpware/snmpy.git
+cd snmpy
+python3 setup.py install
 ```
 
 ### Prerequisites
@@ -82,7 +91,9 @@ pip install -r requirements.txt
 **Required packages:**
 - `cryptography>=41.0.0` - Encryption support for SNMPv3 and credential storage
 - `psutil>=5.9.0` - System monitoring and resource management
-- `snmpy>=2.1.0` - Advanced SNMP library with trap support
+- `pysnmp==4.4.12` - SNMP protocol implementation (v4 for compatibility)
+- `pyasn1>=0.4.8` - ASN.1 types and codecs (required by pysnmp)
+- `snmpy` - Advanced SNMP library with trap support (from GitHub)
 - `Pillow>=10.0.0` - Image processing for logo display
 - `matplotlib>=3.5.0` - Performance graphs (optional but recommended)
 
@@ -168,12 +179,40 @@ pyinstaller --onefile --windowed --icon=icon.png \
 2. View real-time metrics after operations
 3. Export data for analysis
 
+## 🌍 Multi-Language Support
+
+SNMP Browser Professional supports 13 languages out of the box:
+
+- 🇬🇧 English (en)
+- 🇪🇸 Spanish (es) - Español
+- 🇫🇷 French (fr) - Français
+- 🇩🇪 German (de) - Deutsch
+- 🇮🇹 Italian (it) - Italiano
+- 🇨🇳 Chinese (zh) - 中文
+- 🇯🇵 Japanese (ja) - 日本語
+- 🇵🇹 Portuguese (pt) - Português
+- 🇷🇺 Russian (ru) - Русский
+- 🇸🇪 Swedish (sv) - Svenska
+- 🇸🇦 Arabic (ar) - العربية
+- 🇮🇳 Hindi (hi) - हिन्दी
+- 🇭🇺 Hungarian (hu) - Magyar
+
+### Changing Language
+1. Go to **Help** → **Language**
+2. Select your preferred language
+3. Click **Apply**
+4. Restart the application
+
+### Adding New Languages
+Want to add your language? See the [LANGUAGE_GUIDE.md](LANGUAGE_GUIDE.md) for step-by-step instructions. Contributions are welcome!
+
 ## 🔧 Configuration Files
 
 The application creates several configuration files:
-- `snmp_browser_config.json` - Main configuration
+- `snmp_browser_config.json` - Main configuration (includes language preference)
 - `snmp_browser_saved.json` - Dashboard items
 - `snmp_profiles.json` - Saved connection profiles
+- `languages.json` - Multi-language translations
 - `.SNMPBrowser_key` - Encryption key (keep secure!)
 - `logs/` - Directory containing rotating log files
 
@@ -240,7 +279,9 @@ cryptography>=41.0.0
 psutil>=5.9.0
 Pillow>=10.0.0
 matplotlib>=3.5.0
-git+https://github.com/JustVugg/snmpy.git@v2.1.0
+pysnmp==4.4.12
+pyasn1>=0.4.8
+git+https://github.com/snmpware/snmpy.git
 ```
 
 ### Development Requirements
@@ -286,7 +327,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## 🙏 Acknowledgments
 
-- **SNMP Library**: [snmpy](https://github.com/JustVugg/snmpy) by [JustVugg](https://github.com/JustVugg)
+- **SNMP Library**: [snmpy](https://github.com/snmpware/snmpy) by [snmpware](https://github.com/snmpware)
 - **GUI Framework**: [tkinter](https://docs.python.org/3/library/tkinter.html)
 - **Icons**: Material Design Icons
 - **Executable Packaging**: [PyInstaller](https://pyinstaller.readthedocs.io/)

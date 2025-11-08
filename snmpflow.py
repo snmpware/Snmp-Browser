@@ -773,6 +773,98 @@ class MemoryLimitedScanner:
         self.results_count += 1
 
 
+class LanguageManager:
+    """Manages multi-language support for the application"""
+
+    def __init__(self, logger, languages_file="languages.json", default_language="en"):
+        self.logger = logger
+        self.languages_file = languages_file
+        self.default_language = default_language
+        self.current_language = default_language
+        self.languages = {}
+        self.translations = {}
+        self.load_languages()
+
+    def load_languages(self):
+        """Load language definitions from JSON file"""
+        try:
+            if os.path.exists(self.languages_file):
+                with open(self.languages_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.languages = data.get('languages', {})
+                    if self.current_language in self.languages:
+                        self.translations = self.languages[self.current_language].get('translations', {})
+                    self.logger.info(f"Loaded {len(self.languages)} languages from {self.languages_file}")
+            else:
+                self.logger.warning(f"Languages file not found: {self.languages_file}. Using default English.")
+                self.create_default_english()
+        except Exception as e:
+            self.logger.error(f"Error loading languages: {e}")
+            self.create_default_english()
+
+    def create_default_english(self):
+        """Create minimal default English translations"""
+        self.languages = {
+            "en": {
+                "name": "English",
+                "translations": {
+                    "app_title": "SNMP Browser",
+                    "file": "File",
+                    "tools": "Tools",
+                    "help": "Help"
+                }
+            }
+        }
+        self.translations = self.languages["en"]["translations"]
+
+    def set_language(self, language_code):
+        """Change the current language"""
+        if language_code in self.languages:
+            self.current_language = language_code
+            self.translations = self.languages[language_code].get('translations', {})
+            self.logger.info(f"Language changed to: {self.languages[language_code]['name']}")
+            return True
+        else:
+            self.logger.warning(f"Language not found: {language_code}")
+            return False
+
+    def get(self, key, default=None, **kwargs):
+        """Get translated string for a key with optional formatting
+
+        Args:
+            key: Translation key
+            default: Default value if key not found
+            **kwargs: Format arguments for string formatting
+
+        Returns:
+            Translated and formatted string
+        """
+        text = self.translations.get(key, default or key)
+
+        # Apply formatting if kwargs provided
+        if kwargs:
+            try:
+                text = text.format(**kwargs)
+            except (KeyError, ValueError) as e:
+                self.logger.warning(f"Error formatting translation '{key}': {e}")
+
+        return text
+
+    def get_available_languages(self):
+        """Get list of available languages with their names"""
+        return [(code, lang.get('name', code)) for code, lang in self.languages.items()]
+
+    def get_current_language(self):
+        """Get current language code"""
+        return self.current_language
+
+    def get_current_language_name(self):
+        """Get current language display name"""
+        if self.current_language in self.languages:
+            return self.languages[self.current_language].get('name', self.current_language)
+        return self.current_language
+
+
 class SnmpBrowserGUI:
     """SNMP Browser Production Ready Enhanced GUI"""
 
@@ -788,6 +880,17 @@ class SnmpBrowserGUI:
         self.logger.info("Starting SNMP Browser")
         self.logger.info(f"System: {sys.platform}, Python: {sys.version}")
 
+        # Configuration files
+        self.config_file = "snmp_browser_config.json"
+        self.saved_values_file = "snmp_browser_saved.json"
+
+        # Load language preference from config BEFORE initializing LanguageManager
+        saved_language = self.get_saved_language()
+
+        # Initialize language manager with saved language (needed for UI creation)
+        self.language_manager = LanguageManager(self.logger, default_language=saved_language)
+        self._ = self.language_manager.get  # Shorthand for translations
+
         # Component managers
         self.credential_manager = SecureCredentialManager()
         self.profile_manager = ProfileManager(credential_manager=self.credential_manager)
@@ -795,7 +898,7 @@ class SnmpBrowserGUI:
         self.performance_monitor = PerformanceMonitor()
         self.batch_operations = BatchOperations(self.logger)
         self.trap_receiver = None
-        
+
         # Base configuration variables
         self.host_var = tk.StringVar(value="192.168.1.1")
         self.community_var = tk.StringVar(value="public")
@@ -833,10 +936,6 @@ class SnmpBrowserGUI:
         self.max_results_var = tk.StringVar(value="10000")
         self.max_memory_var = tk.StringVar(value="500")
         self.memory_scanner = None
-
-        # Configuration files
-        self.config_file = "snmp_browser_config.json"
-        self.saved_values_file = "snmp_browser_saved.json"
 
         # OID dictionary
         self.oid_names = self._build_oid_names_dictionary()
@@ -895,6 +994,18 @@ class SnmpBrowserGUI:
         # Add handlers
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
+
+    def get_saved_language(self):
+        """Load language preference from config file before UI creation"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                    return config.get('language', 'en')
+        except Exception:
+            # If any error, just return default
+            pass
+        return 'en'
 
     def send_trap(self):
         """Send an SNMP trap"""
@@ -1215,47 +1326,49 @@ class SnmpBrowserGUI:
 
         # File Menu
         file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Save Configuration", command=self.save_config, accelerator="Ctrl+S")
-        file_menu.add_command(label="Load Configuration", command=self.load_config_dialog, accelerator="Ctrl+O")
+        menubar.add_cascade(label=self._("file"), menu=file_menu)
+        file_menu.add_command(label=self._("save_configuration"), command=self.save_config, accelerator="Ctrl+S")
+        file_menu.add_command(label=self._("load_configuration"), command=self.load_config_dialog, accelerator="Ctrl+O")
         file_menu.add_separator()
-        file_menu.add_command(label="Profile Manager", command=self.show_profile_manager)
+        file_menu.add_command(label=self._("profile_manager"), command=self.show_profile_manager)
         file_menu.add_separator()
-        file_menu.add_command(label="Export Results", command=self.export_results, accelerator="Ctrl+E")
+        file_menu.add_command(label=self._("export_results"), command=self.export_results, accelerator="Ctrl+E")
         file_menu.add_separator()
-        file_menu.add_command(label="View Logs", command=self.show_log_viewer)
+        file_menu.add_command(label=self._("view_logs"), command=self.show_log_viewer)
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.on_closing, accelerator="Ctrl+Q")
+        file_menu.add_command(label=self._("exit"), command=self.on_closing, accelerator="Ctrl+Q")
 
         # Tools Menu
         tools_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Tools", menu=tools_menu)
-        tools_menu.add_command(label="Test Connection", command=self.test_connection, accelerator="Ctrl+T")
-        tools_menu.add_command(label="Full SNMP Walk", command=self.full_walk)
-        tools_menu.add_command(label="Batch Operations", command=self.show_batch_operations)
+        menubar.add_cascade(label=self._("tools"), menu=tools_menu)
+        tools_menu.add_command(label=self._("test_connection"), command=self.test_connection, accelerator="Ctrl+T")
+        tools_menu.add_command(label=self._("full_snmp_walk"), command=self.full_walk)
+        tools_menu.add_command(label=self._("batch_operations"), command=self.show_batch_operations)
         tools_menu.add_separator()
-        tools_menu.add_command(label="Trap Receiver", command=self.toggle_trap_receiver)
-        tools_menu.add_command(label="Performance Monitor", command=self.show_performance_window)
+        tools_menu.add_command(label=self._("trap_receiver"), command=self.toggle_trap_receiver)
+        tools_menu.add_command(label=self._("performance_monitor"), command=self.show_performance_window)
         tools_menu.add_separator()
-        tools_menu.add_command(label="Load MIB", command=self.load_mib_file)
-        tools_menu.add_command(label="Search MIB", command=self.search_mib_definitions)
+        tools_menu.add_command(label=self._("load_mib"), command=self.load_mib_file)
+        tools_menu.add_command(label=self._("search_mib"), command=self.search_mib_definitions)
         tools_menu.add_separator()
-        tools_menu.add_command(label="SNMP Hex Decoder", command=self.show_hex_decoder)
+        tools_menu.add_command(label=self._("snmp_hex_decoder"), command=self.show_hex_decoder)
         tools_menu.add_separator()
-        tools_menu.add_command(label="SNMPv3 Wizard", command=self.show_snmpv3_wizard)
-        tools_menu.add_command(label="Discover Engine ID", command=self.discover_engine_id)
+        tools_menu.add_command(label=self._("snmpv3_wizard"), command=self.show_snmpv3_wizard)
+        tools_menu.add_command(label=self._("discover_engine_id"), command=self.discover_engine_id)
         tools_menu.add_separator()
-        tools_menu.add_command(label="Clear Cache", command=self.clear_cache)
-        tools_menu.add_command(label="Settings", command=self.show_settings)
+        tools_menu.add_command(label=self._("clear_cache"), command=self.clear_cache)
+        tools_menu.add_command(label=self._("settings"), command=self.show_settings)
 
         # Help Menu
         help_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="Help", command=self.show_help, accelerator="F1")
-        help_menu.add_command(label="Shortcuts", command=self.show_shortcuts)
-        help_menu.add_command(label="Debug Info", command=self.show_debug_info)
+        menubar.add_cascade(label=self._("help"), menu=help_menu)
+        help_menu.add_command(label=self._("language"), command=self.change_language)
         help_menu.add_separator()
-        help_menu.add_command(label="About", command=self.show_about)
+        help_menu.add_command(label=self._("help"), command=self.show_help, accelerator="F1")
+        help_menu.add_command(label=self._("shortcuts"), command=self.show_shortcuts)
+        help_menu.add_command(label=self._("debug_info"), command=self.show_debug_info)
+        help_menu.add_separator()
+        help_menu.add_command(label=self._("about"), command=self.show_about)
 
 
     def show_hex_decoder(self):
@@ -1352,37 +1465,37 @@ class SnmpBrowserGUI:
 
     def create_config_frame(self, parent):
         """Configuration frame with profiles"""
-        config_frame = ttk.LabelFrame(parent, text="SNMP Configuration")
+        config_frame = ttk.LabelFrame(parent, text=self._("snmp_configuration"))
         config_frame.pack(fill=tk.X, pady=(0, 5))
 
         # First row - Profiles
         profile_row = ttk.Frame(config_frame)
         profile_row.pack(fill=tk.X, padx=5, pady=5)
-        
-        ttk.Label(profile_row, text="Profile:").pack(side=tk.LEFT)
+
+        ttk.Label(profile_row, text=self._("profile") + ":").pack(side=tk.LEFT)
         self.profile_combo = ttk.Combobox(profile_row, textvariable=self.current_profile_var,
                                           width=15, state='readonly')
         self.profile_combo.pack(side=tk.LEFT, padx=(5, 10))
         self.profile_combo.bind('<<ComboboxSelected>>', self.on_profile_selected)
-        
-        ttk.Button(profile_row, text="Save", command=self.save_current_profile).pack(side=tk.LEFT, padx=2)
-        ttk.Button(profile_row, text="Manage", command=self.show_profile_manager).pack(side=tk.LEFT, padx=2)
-        
+
+        ttk.Button(profile_row, text=self._("save"), command=self.save_current_profile).pack(side=tk.LEFT, padx=2)
+        ttk.Button(profile_row, text=self._("manage"), command=self.show_profile_manager).pack(side=tk.LEFT, padx=2)
+
         self.update_profile_list()
 
         # Second row
         row1 = ttk.Frame(config_frame)
         row1.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(row1, text="Host:").pack(side=tk.LEFT)
+        ttk.Label(row1, text=self._("host") + ":").pack(side=tk.LEFT)
         self.host_entry = ttk.Entry(row1, textvariable=self.host_var, width=15)
         self.host_entry.pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Label(row1, text="Port:").pack(side=tk.LEFT)
+        ttk.Label(row1, text=self._("port") + ":").pack(side=tk.LEFT)
         self.port_entry = ttk.Entry(row1, textvariable=self.port_var, width=6)
         self.port_entry.pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Label(row1, text="Version:").pack(side=tk.LEFT)
+        ttk.Label(row1, text=self._("version") + ":").pack(side=tk.LEFT)
         version_combo = ttk.Combobox(row1, textvariable=self.version_var, width=5,
                                      values=["1", "2c", "3"], state='readonly')
         version_combo.pack(side=tk.LEFT, padx=(5, 10))
@@ -1391,52 +1504,52 @@ class SnmpBrowserGUI:
         self.v1v2_frame = ttk.Frame(row1)
         self.v1v2_frame.pack(side=tk.LEFT, padx=(10, 0))
 
-        ttk.Label(self.v1v2_frame, text="Community:").pack(side=tk.LEFT)
+        ttk.Label(self.v1v2_frame, text=self._("community") + ":").pack(side=tk.LEFT)
         ttk.Entry(self.v1v2_frame, textvariable=self.community_var, width=10).pack(side=tk.LEFT, padx=(5, 10))
 
         # Third row
         row2 = ttk.Frame(config_frame)
         row2.pack(fill=tk.X, padx=5, pady=(0, 5))
 
-        ttk.Label(row2, text="Timeout:").pack(side=tk.LEFT)
+        ttk.Label(row2, text=self._("timeout") + ":").pack(side=tk.LEFT)
         ttk.Entry(row2, textvariable=self.timeout_var, width=6).pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Label(row2, text="Retries:").pack(side=tk.LEFT)
+        ttk.Label(row2, text=self._("retries") + ":").pack(side=tk.LEFT)
         ttk.Entry(row2, textvariable=self.retries_var, width=6).pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Checkbutton(row2, text="Extended Scan",
+        ttk.Checkbutton(row2, text=self._("extended_scan"),
                         variable=self.extended_scan_var).pack(side=tk.LEFT, padx=(20, 10))
 
         # Buttons
         btn_frame = ttk.Frame(row2)
         btn_frame.pack(side=tk.RIGHT, padx=5)
 
-        self.scan_btn = ttk.Button(btn_frame, text="Start Scan", command=self.start_scan)
+        self.scan_btn = ttk.Button(btn_frame, text=self._("start_scan"), command=self.start_scan)
         self.scan_btn.pack(side=tk.LEFT, padx=2)
 
-        self.stop_btn = ttk.Button(btn_frame, text="Stop", command=self.stop_scan, state=tk.DISABLED)
+        self.stop_btn = ttk.Button(btn_frame, text=self._("stop"), command=self.stop_scan, state=tk.DISABLED)
         self.stop_btn.pack(side=tk.LEFT, padx=2)
 
-        ttk.Button(btn_frame, text="Test", command=self.test_connection).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="Batch", command=self.show_batch_operations).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text=self._("test"), command=self.test_connection).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text=self._("batch"), command=self.show_batch_operations).pack(side=tk.LEFT, padx=2)
 
         # SNMPv3 Frame
-        self.v3_frame = ttk.LabelFrame(config_frame, text="SNMPv3 Configuration")
+        self.v3_frame = ttk.LabelFrame(config_frame, text=self._("snmpv3_configuration"))
 
         # First v3 row
         v3_row1 = ttk.Frame(self.v3_frame)
         v3_row1.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(v3_row1, text="Username:").pack(side=tk.LEFT)
+        ttk.Label(v3_row1, text=self._("username") + ":").pack(side=tk.LEFT)
         ttk.Entry(v3_row1, textvariable=self.v3_user_var, width=15).pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Label(v3_row1, text="Auth:").pack(side=tk.LEFT)
+        ttk.Label(v3_row1, text=self._("auth") + ":").pack(side=tk.LEFT)
         auth_combo = ttk.Combobox(v3_row1, textvariable=self.v3_auth_protocol_var, width=10,
                                   values=["noAuth", "MD5", "SHA", "SHA256", "SHA384", "SHA512"])
         auth_combo.pack(side=tk.LEFT, padx=(5, 10))
         auth_combo.state(['readonly'])
 
-        ttk.Label(v3_row1, text="Auth Pass:").pack(side=tk.LEFT)
+        ttk.Label(v3_row1, text=self._("auth_pass") + ":").pack(side=tk.LEFT)
         self.auth_pass_entry = ttk.Entry(v3_row1, textvariable=self.v3_auth_password_var,
                                          width=15, show="*")
         self.auth_pass_entry.pack(side=tk.LEFT, padx=(5, 10))
@@ -1445,31 +1558,31 @@ class SnmpBrowserGUI:
         v3_row2 = ttk.Frame(self.v3_frame)
         v3_row2.pack(fill=tk.X, padx=5, pady=(0, 5))
 
-        ttk.Label(v3_row2, text="Priv:").pack(side=tk.LEFT)
+        ttk.Label(v3_row2, text=self._("priv") + ":").pack(side=tk.LEFT)
         priv_combo = ttk.Combobox(v3_row2, textvariable=self.v3_priv_protocol_var, width=10,
                                   values=["noPriv", "DES", "AES128", "AES192", "AES256"])
         priv_combo.pack(side=tk.LEFT, padx=(5, 10))
         priv_combo.state(['readonly'])
 
-        ttk.Label(v3_row2, text="Priv Pass:").pack(side=tk.LEFT)
+        ttk.Label(v3_row2, text=self._("priv_pass") + ":").pack(side=tk.LEFT)
         self.priv_pass_entry = ttk.Entry(v3_row2, textvariable=self.v3_priv_password_var,
                                          width=15, show="*")
         self.priv_pass_entry.pack(side=tk.LEFT, padx=(5, 10))
 
-        ttk.Checkbutton(v3_row2, text="Show",
+        ttk.Checkbutton(v3_row2, text=self._("show"),
                         variable=self.v3_show_passwords,
                         command=self.toggle_password_visibility).pack(side=tk.LEFT, padx=(10, 5))
 
-        ttk.Button(v3_row2, text="Engine ID",
+        ttk.Button(v3_row2, text=self._("engine_id"),
                    command=self.discover_engine_id).pack(side=tk.LEFT, padx=5)
 
-        ttk.Button(v3_row2, text="Test v3",
+        ttk.Button(v3_row2, text=self._("test_v3"),
                    command=self.test_snmpv3_connection).pack(side=tk.LEFT, padx=5)
 
     def create_trap_tab(self):
         """Tab for trap receiver AND SENDER"""
         trap_frame = ttk.Frame(self.notebook)
-        self.notebook.add(trap_frame, text="Trap Manager")
+        self.notebook.add(trap_frame, text=self._("trap_manager"))
         
         # Internal notebook for Receiver and Sender
         trap_notebook = ttk.Notebook(trap_frame)
@@ -1659,10 +1772,10 @@ class SnmpBrowserGUI:
     def create_performance_tab(self):
         """Tab for performance metrics"""
         perf_frame = ttk.Frame(self.notebook)
-        self.notebook.add(perf_frame, text="Performance")
-        
+        self.notebook.add(perf_frame, text=self._("performance"))
+
         # Controls
-        control_frame = ttk.LabelFrame(perf_frame, text="Performance Controls")
+        control_frame = ttk.LabelFrame(perf_frame, text=self._("performance_controls"))
         control_frame.pack(fill=tk.X, padx=5, pady=5)
         
         controls = ttk.Frame(control_frame)
@@ -2462,7 +2575,7 @@ CPU Usage: {summary['cpu_percent']}%
     def create_browser_tab(self):
         """Main Browser tab"""
         browser_frame = ttk.Frame(self.notebook)
-        self.notebook.add(browser_frame, text="SNMP Browser")
+        self.notebook.add(browser_frame, text=self._("browser"))
 
         # Filters
         filter_frame = ttk.LabelFrame(browser_frame, text="Filters")
@@ -2513,7 +2626,7 @@ CPU Usage: {summary['cpu_percent']}%
     def create_dashboard_tab(self):
         """Dashboard tab"""
         dashboard_frame = ttk.Frame(self.notebook)
-        self.notebook.add(dashboard_frame, text="Dashboard")
+        self.notebook.add(dashboard_frame, text=self._("dashboard"))
 
         # Controls
         control_frame = ttk.LabelFrame(dashboard_frame, text="Dashboard Controls")
@@ -2547,7 +2660,7 @@ CPU Usage: {summary['cpu_percent']}%
     def create_mib_tree_tab(self):
         """MIB tree tab with value column"""
         mib_frame = ttk.Frame(self.notebook)
-        self.notebook.add(mib_frame, text="MIB Tree")
+        self.notebook.add(mib_frame, text=self._("mib_tree"))
 
         # Controls
         control_frame = ttk.LabelFrame(mib_frame, text="MIB Tree Controls")
@@ -3911,7 +4024,8 @@ CPU Usage: {summary['cpu_percent']}%
             'extended_scan': self.extended_scan_var.get(),
             'max_results': self.max_results_var.get(),
             'max_memory': self.max_memory_var.get(),
-            'current_profile': self.current_profile_var.get()
+            'current_profile': self.current_profile_var.get(),
+            'language': self.language_manager.get_current_language()
         }
 
         if self.version_var.get() == "3":
@@ -3932,6 +4046,26 @@ CPU Usage: {summary['cpu_percent']}%
         except Exception as e:
             self.logger.error(f"Error saving config: {e}")
 
+    def save_language_preference(self, language_code):
+        """Save language preference to config"""
+        try:
+            # Load existing config if it exists
+            config = {}
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+
+            # Update language
+            config['language'] = language_code
+
+            # Save config
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+
+            self.logger.info(f"Language preference saved: {language_code}")
+        except Exception as e:
+            self.logger.error(f"Error saving language preference: {e}")
+
     def load_config(self):
         """Load configuration with decryption"""
         try:
@@ -3949,6 +4083,10 @@ CPU Usage: {summary['cpu_percent']}%
                 self.max_results_var.set(config.get('max_results', '10000'))
                 self.max_memory_var.set(config.get('max_memory', '500'))
                 self.current_profile_var.set(config.get('current_profile', 'Default'))
+
+                # Load language preference
+                if 'language' in config:
+                    self.language_manager.set_language(config['language'])
 
                 if 'v3_user' in config:
                     self.v3_user_var.set(config.get('v3_user', ''))
@@ -4723,11 +4861,85 @@ SHORTCUTS:
 
         ttk.Button(help_window, text="OK", command=help_window.destroy).pack(pady=10)
 
+    def change_language(self):
+        """Show language selection dialog"""
+        lang_window = tk.Toplevel(self.root)
+        lang_window.title(self._("select_language"))
+        lang_window.geometry("350x400")
+        lang_window.resizable(False, False)
+        lang_window.transient(self.root)
+
+        # Center window
+        lang_window.update_idletasks()
+        x = (lang_window.winfo_screenwidth() // 2) - (350 // 2)
+        y = (lang_window.winfo_screenheight() // 2) - (400 // 2)
+        lang_window.geometry(f'+{x}+{y}')
+
+        # Main frame
+        main_frame = ttk.Frame(lang_window)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # Title
+        ttk.Label(main_frame, text=self._("select_language"),
+                font=('TkDefaultFont', 14, 'bold')).pack(pady=(0, 15))
+
+        # Language list
+        listbox_frame = ttk.Frame(main_frame)
+        listbox_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(listbox_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Listbox
+        lang_listbox = tk.Listbox(listbox_frame, yscrollcommand=scrollbar.set,
+                                  font=('TkDefaultFont', 11), height=12)
+        lang_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=lang_listbox.yview)
+
+        # Populate languages
+        languages = self.language_manager.get_available_languages()
+        current_lang = self.language_manager.get_current_language()
+        current_index = 0
+
+        for i, (code, name) in enumerate(languages):
+            if code == current_lang:
+                lang_listbox.insert(tk.END, f"✓ {name}")
+                current_index = i
+            else:
+                lang_listbox.insert(tk.END, f"  {name}")
+
+        lang_listbox.selection_set(current_index)
+        lang_listbox.see(current_index)
+
+        # Button frame
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(pady=(15, 0))
+
+        def apply_language():
+            selection = lang_listbox.curselection()
+            if selection:
+                index = selection[0]
+                code, name = languages[index]
+                if self.language_manager.set_language(code):
+                    self.save_language_preference(code)
+                    messagebox.showinfo(
+                        self._("success"),
+                        f"{self._('language')} {self._('info').lower()}: {name}\n\n"
+                        f"Please restart the application for all changes to take effect."
+                    )
+                    lang_window.destroy()
+
+        ttk.Button(btn_frame, text=self._("apply"), command=apply_language,
+                style='Accent.TButton').pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text=self._("cancel"),
+                command=lang_window.destroy).pack(side=tk.LEFT, padx=5)
+
     def show_about(self):
         """Show about window with logo"""
         # Create custom window
         about_window = tk.Toplevel(self.root)
-        about_window.title("About SNMP Browser")
+        about_window.title(self._("about") + " - SNMP Browser")
         about_window.geometry("450x490")
         about_window.resizable(False, False)
         about_window.transient(self.root)
