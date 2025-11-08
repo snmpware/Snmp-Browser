@@ -18,7 +18,7 @@ Advanced SNMP browser with modern GUI for network device discovery, monitoring, 
 ### Core Capabilities
 - **SNMPv1/v2c/v3 Support** - Complete SNMP protocol support with authentication and encryption
 - **Modern GUI Interface** - Professional tabbed interface built with tkinter
-- **Multi-Language Support** - 10 languages including English, Spanish, French, German, Chinese, Japanese, Portuguese, Russian, Arabic, and Hindi
+- **Multi-Language Support** - 13 languages including English, Spanish, French, German, Italian, Chinese, Japanese, Portuguese, Russian, Swedish, Arabic, Hindi, and Hungarian
 - **Cross-Platform** - Native support for Windows and Linux systems
 - **Network Device Discovery** - Browse and explore SNMP-enabled devices
 - **Real-time Monitoring** - Live monitoring with auto-refresh capabilities
@@ -181,18 +181,21 @@ pyinstaller --onefile --windowed --icon=icon.png \
 
 ## 🌍 Multi-Language Support
 
-SNMP Browser Professional supports 10 languages out of the box:
+SNMP Browser Professional supports 13 languages out of the box:
 
 - 🇬🇧 English (en)
 - 🇪🇸 Spanish (es) - Español
 - 🇫🇷 French (fr) - Français
 - 🇩🇪 German (de) - Deutsch
+- 🇮🇹 Italian (it) - Italiano
 - 🇨🇳 Chinese (zh) - 中文
 - 🇯🇵 Japanese (ja) - 日本語
 - 🇵🇹 Portuguese (pt) - Português
 - 🇷🇺 Russian (ru) - Русский
+- 🇸🇪 Swedish (sv) - Svenska
 - 🇸🇦 Arabic (ar) - العربية
 - 🇮🇳 Hindi (hi) - हिन्दी
+- 🇭🇺 Hungarian (hu) - Magyar
 
 ### Changing Language
 1. Go to **Help** → **Language**
