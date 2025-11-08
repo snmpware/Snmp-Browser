@@ -880,8 +880,15 @@ class SnmpBrowserGUI:
         self.logger.info("Starting SNMP Browser")
         self.logger.info(f"System: {sys.platform}, Python: {sys.version}")
 
-        # Initialize language manager first (needed for UI creation)
-        self.language_manager = LanguageManager(self.logger)
+        # Configuration files
+        self.config_file = "snmp_browser_config.json"
+        self.saved_values_file = "snmp_browser_saved.json"
+
+        # Load language preference from config BEFORE initializing LanguageManager
+        saved_language = self.get_saved_language()
+
+        # Initialize language manager with saved language (needed for UI creation)
+        self.language_manager = LanguageManager(self.logger, default_language=saved_language)
         self._ = self.language_manager.get  # Shorthand for translations
 
         # Component managers
@@ -891,7 +898,7 @@ class SnmpBrowserGUI:
         self.performance_monitor = PerformanceMonitor()
         self.batch_operations = BatchOperations(self.logger)
         self.trap_receiver = None
-        
+
         # Base configuration variables
         self.host_var = tk.StringVar(value="192.168.1.1")
         self.community_var = tk.StringVar(value="public")
@@ -929,10 +936,6 @@ class SnmpBrowserGUI:
         self.max_results_var = tk.StringVar(value="10000")
         self.max_memory_var = tk.StringVar(value="500")
         self.memory_scanner = None
-
-        # Configuration files
-        self.config_file = "snmp_browser_config.json"
-        self.saved_values_file = "snmp_browser_saved.json"
 
         # OID dictionary
         self.oid_names = self._build_oid_names_dictionary()
@@ -991,6 +994,18 @@ class SnmpBrowserGUI:
         # Add handlers
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
+
+    def get_saved_language(self):
+        """Load language preference from config file before UI creation"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                    return config.get('language', 'en')
+        except Exception:
+            # If any error, just return default
+            pass
+        return 'en'
 
     def send_trap(self):
         """Send an SNMP trap"""
