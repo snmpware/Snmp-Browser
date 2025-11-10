@@ -1,7 +1,7 @@
 <p align="center">
-  <img src="snmpbrowser.png" alt="PolymCP Logo" width="400"/>
+  <img src="snmpbrowser.png" alt="Logo" width="800"/>
 </p>
-
+<br>
 <div align="center">
   <img src="Screenshot.png" alt="Main Window">
   <p><em>Main SNMP Browser Interface with Advanced Monitoring</em></p>
