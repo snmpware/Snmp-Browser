@@ -1,4 +1,6 @@
-# SNMP Browser Professional
+<p align="center">
+  <img src="snmpbrowser.png" alt="PolymCP Logo" width="400"/>
+</p>
 
 <div align="center">
   <img src="Screenshot.png" alt="Main Window">
