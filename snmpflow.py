@@ -795,28 +795,25 @@ class SnmpBrowserGUI:
         app_name = "SNMPBrowser"
 
         if sys.platform.startswith('win'):
-            # Windows: C:\Users```math
-            app_name = "SNMPBrowser"
-            if sys.platform.startswith('win'):
-                # Windows: C:\Users\<user>\AppData\Local\SNMPBrowser
-                base_dir = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
-                app_dir = os.path.join(base_dir, app_name)
-            elif sys.platform.startswith('darwin'):
-                # macOS: ~/Library/Application Support/SNMPBrowser
-                app_dir = os.path.expanduser(f'~/Library/Application Support/{app_name}')
-            else:
-                # Linux: ~/.config/SNMPBrowser
-                config_home = os.environ.get('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
-                app_dir = os.path.join(config_home, app_name)
+            # Windows: C:\Users\<user>\AppData\Local\SNMPBrowser
+            base_dir = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
+            app_dir = os.path.join(base_dir, app_name)
+        elif sys.platform.startswith('darwin'):
+            # macOS: ~/Library/Application Support/SNMPBrowser
+            app_dir = os.path.expanduser(f'~/Library/Application Support/{app_name}')
+        else:
+            # Linux: ~/.config/SNMPBrowser
+            config_home = os.environ.get('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
+            app_dir = os.path.join(config_home, app_name)
 
-            # Crea la cartella se non esiste
-            os.makedirs(app_dir, exist_ok=True)
+        # Crea la cartella se non esiste
+        os.makedirs(app_dir, exist_ok=True)
 
-            # Crea anche sottocartella per i log
-            log_dir = os.path.join(app_dir, 'logs')
-            os.makedirs(log_dir, exist_ok=True)
+        # Crea anche sottocartella per i log
+        log_dir = os.path.join(app_dir, 'logs')
+        os.makedirs(log_dir, exist_ok=True)
 
-            return app_dir
+        return app_dir
 
     def _get_data_file_path(self, filename):
         """Ottiene percorso completo per un file dati"""
